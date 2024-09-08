@@ -1,78 +1,40 @@
-import requests
-import json
 import warnings
+import json
+import requests
+import asyncio
 
 import pandas as pd
-import numpy as np
 
 from pathlib import Path
 from datetime import date
-from tqdm import tqdm
+
+from utils import StockFetcher, AsyncStockFetcher, interval, const
 
 warnings.simplefilter(action=r'ignore', category=FutureWarning)
 
 
-class interval:
-    def __init__(self, lower, upper) -> None:
-        self.__lower = lower
-        self.__upper = upper
-
-    def get_lower(self):
-        return self.__lower
+def seq_routine(infoDict, threDict, stockCodeList, savedir):
+    fetcher = StockFetcher(infoDict=infoDict,
+                          threDict=threDict,
+                          stockList=stockCodeList)
     
-    def get_upper(self):
-        return self.__upper
+    fetcher.seak_data()    # get all stock information
+    fetcher.data_filter()  # filter stocks according to thresholds
+
+    # print(seaker.df)
+    # save interset stock inforamtion to file
+    fetcher.save_data(savedir=savedir)
+
+
+async def async_routine(infoDict, threDict, stockCodeList, savedir):
+    fetcher = AsyncStockFetcher(infoDict=infoDict,
+                                threDict=threDict,
+                                stockList=stockCodeList)
     
+    await fetcher.seak_data()  # get all stock information
+    fetcher.filter_data()      # filter stocks according to thresholds
 
-class const(object):
-    class ConstError(TypeError): 
-        pass
-    class ConstCaseError(ConstError):
-        pass
-
-    def __setattr__(self, name, value):
-        if self.__dict__.has_key(name):
-            raise self.ConstError("can't change const.%s" % name)
-        if not name.isupper():
-            raise self.ConstCaseError("const name '%s' is not all uppercase" % name)
-
-        self.__dict__[name] = value
-
-
-class AStockInfoSeaker:
-    def __init__(self, infoDict, threDict, stockList: list) -> None:
-        self.__infoDict = infoDict
-        self.__stockList = stockList
-        self.__therDict = threDict
-
-        self.df = pd.DataFrame(np.zeros((len(self.__stockList), len(self.__infoDict))),
-                               columns=list(self.__infoDict.keys()))
-        
-    def seak_data(self):
-        for idx in tqdm(range(len(self.__stockList))):
-            stockCode = self.__stockList[idx]
-            # print(stockCode)
-            url = f'http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stockCode},m1,,10'
-
-            resp = json.loads(requests.get(url).content)
-            rawData = resp['data'][stockCode]['qt'][stockCode]
-
-            if len(rawData) == 0:
-                raise ValueError('Invaild stock code: {stockCode}.')
-            else:
-                data = [rawData[i] for i in list(self.__infoDict.values())]
-                data[0] = stockCode
-                data[1:] = list(map(float, data[1:]))
-                self.df.loc[idx] = data
-
-    def data_filter(self):
-        for k, v in self.__therDict.items():
-            expr = str(v.get_lower()) + r' <= ' + str(k) + r' <= ' + str(v.get_upper())
-            self.df.query(expr=expr, inplace=True)
-            
-
-    def save_data(self, savedir):
-        self.df.to_csv(savedir, index=False)
+    fetcher.save_data(savedir=savedir)
 
 
 if __name__ == r'__main__':
@@ -83,6 +45,11 @@ if __name__ == r'__main__':
     # if run unit test
     # this variable should only be True when in development mode
     const.IF_RUN_UNITTEST = False
+
+    # if use async to speed up information retrieval
+    # by enabling async, it will reduce the script execution time
+    # but it is possible that useful information cannot be captured
+    const.ENABLE_ASYNC = True
 
     # the index of where the corresponding information is stored
     const.INFO_DICT = {
@@ -136,17 +103,18 @@ if __name__ == r'__main__':
     stockCodeList = df[df.columns[0]].values.tolist()
     # print(len(stockCodeList))
 
-    # create a AStockInfoSeaker instance
-    seaker = AStockInfoSeaker(infoDict=const.INFO_DICT,
-                              threDict=const.THRE_DICT,
-                              stockList=stockCodeList)
+    if const.ENABLE_ASYNC:
+        asyncio.run(async_routine(infoDict=const.INFO_DICT,
+                                  threDict=const.THRE_DICT,
+                                  stockCodeList=stockCodeList,
+                                  savedir=const.RESULT_FILE))
     
-    seaker.seak_data()    # get all stock information
-    seaker.data_filter()  # filter stocks according to thresholds
-
-    # print(seaker.df)
-    # save interset stock inforamtion to file
-    seaker.save_data(savedir=const.RESULT_FILE)
+    else:
+        seq_routine(infoDict=const.INFO_DICT,
+                    threDict=const.THRE_DICT,
+                    stockCodeList=stockCodeList,
+                    savedir=const.RESULT_FILE)
+    
 
     # END OF MAIN ROUTINE
     #---------------------------------------------------------------------------------
