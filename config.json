@@ -1,0 +1,68 @@
+{
+    "CN": {
+        "infoIdxs": {
+            "stockCode": {
+                "index": 2,
+                "valid": true
+            },
+            "currPrice": {
+                "index": 3,
+                "valid": true
+            },
+            "prevClosedPrice": {
+                "index": 4,
+                "valid": true
+            },
+            "openPrice": {
+                "index": 5,
+                "valid": true
+            },
+            "increase": {
+                "index": 32,
+                "valid": true
+            },
+            "highest": {
+                "index": 33,
+                "valid": true
+            },
+            "lowest": {
+                "index": 34,
+                "valid": true
+            },
+            "turnOverRate": {
+                "index": 38,
+                "valid": true
+            },
+            "ampRate": {
+                "index": 43,
+                "valid": true
+            },
+            "tmCap": {
+                "index": 44,
+                "valid": true
+            }
+        },
+        "thre": {
+            "ampRate": {
+                "lower": 3,
+                "upper": 6,
+                "valid": false
+            },
+            "turnOverRate": {
+                "lower": 5,
+                "upper": 10,
+                "valid": true
+            },
+            "tmCap": {
+                "lower": 50,
+                "upper": 120,
+                "valid": true
+            },
+            "increase": {
+                "lower": 3,
+                "upper": 5,
+                "valid": true
+            }
+        }
+    }
+}
