@@ -1,19 +1,29 @@
+#---------------------------------------------------------------------------------
+# Author: Zhang
+# Date: 2024/09/09
+# FOR PERSONAL USE ONLY.
+#---------------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------------
+# IMPORT REQUIRED PACKAGES HERE
+
 import requests
 import json
-# import warnings
 import asyncio
 import aiohttp
 
 import pandas as pd
 import numpy as np
 
-from pathlib import Path
-from datetime import date
 from tqdm import tqdm
 
-# warnings.simplefilter(action=r'ignore', category=FutureWarning)
+# END OF PACKAGE IMPORT
+#---------------------------------------------------------------------------------
 
-class interval:
+#---------------------------------------------------------------------------------
+# DEFINE CLASS HERE
+
+class Interval:
     def __init__(self, lower, upper) -> None:
         self.__lower = lower
         self.__upper = upper
@@ -25,7 +35,7 @@ class interval:
         return self.__upper
     
 
-class const(object):
+class Const(object):
     class ConstError(TypeError): 
         pass
     class ConstCaseError(ConstError):
@@ -39,7 +49,8 @@ class const(object):
 
         self.__dict__[name] = value
 
-
+# a sequential version of StockFetcher
+# sequentially request information for each stock.
 class StockFetcher:
     def __init__(self, infoDict, threDict, stockList: list) -> None:
         self.__infoDict = infoDict
@@ -55,16 +66,28 @@ class StockFetcher:
             # print(stockCode)
             url = f'http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stockCode},m1,,10'
 
-            resp = json.loads(requests.get(url).content)
-            rawData = resp['data'][stockCode]['qt'][stockCode]
+            resp = requests.get(url)
+            if resp.status_code == 403:
+                print(f"Warning: Request for stock {stockCode} was blocked by a firewall.")
+                return None
+            elif 300 <= resp.status_code < 400:
+                print(f'Warning: Request for stock {stockCode} was redirected.')
+                return None
+            elif resp.status_code == 200:
+                if 'window.location.href="https://waf.tencent.com/501page.html' in resp.content.decode():
+                    print(f"Warning: Request for stock {stockCode} was blocked by a firewall.")
+                    return None
 
-            if len(rawData) == 0:
-                raise ValueError('Invaild stock code: {stockCode}.')
-            else:
-                data = [rawData[i] for i in list(self.__infoDict.values())]
-                data[0] = stockCode
-                data[1:] = list(map(float, data[1:]))
-                self.df.loc[idx] = data
+                text = json.loads(resp.content)
+                rawData = text['data'][stockCode]['qt'][stockCode]
+
+                if len(rawData) == 0:
+                    raise ValueError('Invaild stock code: {stockCode}.')
+                else:
+                    data = [rawData[i] for i in list(self.__infoDict.values())]
+                    data[0] = stockCode
+                    data[1:] = list(map(float, data[1:]))
+                    self.df.loc[idx] = data
 
     def data_filter(self):
         for k, v in self.__therDict.items():
@@ -76,6 +99,8 @@ class StockFetcher:
         self.df.to_csv(savedir, index=False)
 
 
+# an async version of StockFetcher. 
+# by requesting the information for each stock at the same time, the exectuing time will be shorten.
 class AsyncStockFetcher:
     def __init__(self, infoDict, threDict, stockList: list) -> None:
         self.__infoDict = infoDict
@@ -130,3 +155,9 @@ class AsyncStockFetcher:
 
     def save_data(self, savedir):
         self.df.to_csv(savedir, index=False)
+
+# END OF CLASS DEFINITION
+#---------------------------------------------------------------------------------
+
+# END OF FILE
+#---------------------------------------------------------------------------------
