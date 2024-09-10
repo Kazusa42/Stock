@@ -63,6 +63,17 @@
                 "upper": 5,
                 "valid": true
             }
+        },
+        "urls": {
+            "search": {
+                "prefix": "http://ifzq.gtimg.cn/appstock/app/kline/mkline?param=",
+                "suffix": ",m1,,10",
+                "valid": true
+            },
+            "firewallWarning": {
+                "text": "window.location.href=\"https://waf.tencent.com/501page.html?u=",
+                "valid": true
+            } 
         }
     }
 }
