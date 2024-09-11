@@ -56,8 +56,6 @@ class Const:
         self.__dict__[name] = value
 
 
-import json
-
 class JsonDataProcessor:
     """
     A class to process JSON data by filtering valid entries and extracting specific dictionaries.
