@@ -7,34 +7,18 @@
 #---------------------------------------------------------------------------------
 # IMPORT REQUIRED PACKAGES HERE
 
-import requests
 import json
 import asyncio
 import aiohttp
 
 import pandas as pd
-import numpy as np
-
-from tqdm import tqdm
 
 # END OF PACKAGE IMPORT
 #---------------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------------
 # DEFINE CLASS HERE
-
-class Interval:
-    def __init__(self, lower, upper) -> None:
-        self.__lower = lower
-        self.__upper = upper
-
-    def get_lower(self):
-        return self.__lower
     
-    def get_upper(self):
-        return self.__upper
-    
-
 class Const(object):
     class ConstError(TypeError): 
         pass
@@ -49,112 +33,106 @@ class Const(object):
 
         self.__dict__[name] = value
 
-# a sequential version of StockFetcher
-# sequentially request information for each stock.
-class StockFetcher:
-    def __init__(self, infoDict, threDict, stockList: list) -> None:
-        self.__infoDict = infoDict
-        self.__stockList = stockList
-        self.__therDict = threDict
 
-        self.df = pd.DataFrame(np.zeros((len(self.__stockList), len(self.__infoDict))),
-                               columns=list(self.__infoDict.keys()))
+class JsonDictProcessor:
+    """
+    A class for processing JSON files containing two-level nested dictionaries.
+    It provides methods to split the JSON file into individual dictionaries and filter
+    them based on a 'valid' flag.
+    """
+
+    def __init__(self, json_file_path):
+        """
+        Initializes the JsonDictProcessor with a path to a JSON file.
         
-    def seak_data(self):
-        for idx in tqdm(range(len(self.__stockList))):
-            stockCode = self.__stockList[idx]
-            # print(stockCode)
-            url = f'http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stockCode},m1,,10'
+        Parameters:
+        json_file_path (str): Path to the JSON file to be processed.
+        """
+        self.json_file_path = json_file_path
+        self.dicts_list = []
+    
+    def split_json_to_dicts(self, region_code):
+        """
+        Splits the JSON file into individual dictionaries.
 
-            resp = requests.get(url)
-            if resp.status_code == 403:
-                print(f"Warning: Request for stock {stockCode} was blocked by a firewall.")
-                return None
-            elif 300 <= resp.status_code < 400:
-                print(f'Warning: Request for stock {stockCode} was redirected.')
-                return None
-            elif resp.status_code == 200:
-                if 'window.location.href="https://waf.tencent.com/501page.html' in resp.content.decode():
-                    print(f"Warning: Request for stock {stockCode} was blocked by a firewall.")
-                    return None
+        Parameters:
+        region_code (str): Indicates which country's stock information will be processed
 
-                text = json.loads(resp.content)
-                rawData = text['data'][stockCode]['qt'][stockCode]
-
-                if len(rawData) == 0:
-                    raise ValueError('Invaild stock code: {stockCode}.')
-                else:
-                    data = [rawData[i] for i in list(self.__infoDict.values())]
-                    data[0] = stockCode
-                    data[1:] = list(map(float, data[1:]))
-                    self.df.loc[idx] = data
-
-    def data_filter(self):
-        for k, v in self.__therDict.items():
-            expr = str(v.get_lower()) + r' <= ' + str(k) + r' <= ' + str(v.get_upper())
-            self.df.query(expr=expr, inplace=True)
-            
-
-    def save_data(self, savedir):
-        self.df.to_csv(savedir, index=False)
+        Returns:
+        List[dict]: A list of dictionaries extracted from the JSON file.
+        """
+        with open(self.json_file_path, 'r') as json_file:
+            data = json.load(json_file)[region_code]
+        
+        self.dicts_list = [value for value in data.values()]
+        return self.dicts_list
+    
+    def filter_valid_entries(self):
+        """
+        Filters the previously split dictionaries, keeping only those where 
+        the 'valid' key is set to True.
+        
+        Returns:
+        List[dict]: A list of dictionaries where 'valid' is True.
+        """
+        if not self.dicts_list:
+            raise ValueError("No dictionaries to filter. Please run split_json_to_dicts() first.")
+        
+        filtered_dicts = [d for d in self.dicts_list if d.get('valid')]
+        return filtered_dicts
 
 
 # an async version of StockFetcher. 
 # by requesting the information for each stock at the same time, the exectuing time will be shorten.
 class AsyncStockFetcher:
-    def __init__(self, infoDict, threDict, stockList: list) -> None:
-        self.__infoDict = infoDict
-        self.__therDict = threDict
-        self.__stockList = stockList
-        self.__data = []
+    def __init__(self, stock_list, interest_info_idxs, thresholds, urls) -> None:
+        self.__stock_list = stock_list
+        self.__interest_info_idxs = interest_info_idxs
+        self.__thresholds = thresholds
+        self.__urls = urls
+        self.__all_data = []
 
-        self.df = pd.DataFrame()
+        self.results = pd.DataFrame()
 
-    async def fetch_stock_data(self, session, stockCode):
-        url = f'http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stockCode},m1,,10'
+    async def __fetch_stock_data(self, session, stock_code):
+        url = self.__urls['search']['prefix'] + str(stock_code) + self.__urls['search']['suffix']
         async with session.get(url, allow_redirects=True) as response:
             if 300 <= response.status < 400:
-                print(f'Warning: Request for stock {stockCode} was redirected.')
+                print(f'Warning: Request for stock {stock_code} was redirected.')
                 return None
-
             elif response.status == 403:
-                print(f"Warning: Request for stock {stockCode} was blocked by a firewall.")
+                print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
                 return None
-                
             elif response.status == 200:
-                info = await response.text()
-
-                if 'window.location.href="https://waf.tencent.com/501page.html' in info:
-                    print(f"Warning: Request for stock {stockCode} was blocked by a firewall.")
+                text = await response.text()
+                if self.__urls['firewallWarning']['text'] in text:
+                    print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
                     return None
+                information = json.loads(text)
+                raw_data = information['data'][stock_code]['qt'][stock_code]
 
-                infoDict = json.loads(info)
-                rawData = infoDict['data'][stockCode]['qt'][stockCode]
-
-                selectedData = [rawData[i] for i in list(self.__infoDict.values())]
-                selectedData[0] = stockCode
-                selectedData[1:] = list(map(float, selectedData[1:]))
-
-                return selectedData      
+                selected_data = [raw_data[val['index']] for val in list(self.__interest_info_idxs.values())]
+                selected_data[0] = stock_code
+                selected_data[1:] = list(map(float, selected_data[1:]))
+                return selected_data
             return None
 
     async def seak_data(self):
         async with aiohttp.ClientSession() as session:
             tasks = []
-            for stockCode in self.__stockList:
-                tasks.append(self.fetch_stock_data(session, stockCode))
+            for stockCode in self.__stock_list:
+                tasks.append(self.__fetch_stock_data(session, stockCode))
             results = await asyncio.gather(*tasks)
-            
-            self.__data = [res for res in results if res is not None]
+            self.__all_data = [res for res in results if res is not None]
 
     def filter_data(self):
-        self.df = pd.DataFrame(self.__data, columns=list(self.__infoDict.keys()))
-        for k, v in self.__therDict.items():
-            expr = str(v.get_lower()) + r' <= ' + str(k) + r' <= ' + str(v.get_upper())
-            self.df.query(expr=expr, inplace=True)
+        self.results = pd.DataFrame(self.__all_data, columns=list(self.__interest_info_idxs.keys()))
+        for k, v in self.__thresholds.items():
+            expression = str(v['lower']) + r'<=' + str(k) + r'<' + str(v['upper'])
+            self.results.query(expression, inplace=True)
 
-    def save_data(self, savedir):
-        self.df.to_csv(savedir, index=False)
+    def save_data(self, save_path):
+        self.results.to_csv(save_path, index=False)
 
 # END OF CLASS DEFINITION
 #---------------------------------------------------------------------------------
