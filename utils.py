@@ -34,54 +34,6 @@ class Const(object):
         self.__dict__[name] = value
 
 
-class JsonDictProcessor:
-    """
-    A class for processing JSON files containing two-level nested dictionaries.
-    It provides methods to split the JSON file into individual dictionaries and filter
-    them based on a 'valid' flag.
-    """
-
-    def __init__(self, json_file_path):
-        """
-        Initializes the JsonDictProcessor with a path to a JSON file.
-        
-        Parameters:
-        json_file_path (str): Path to the JSON file to be processed.
-        """
-        self.json_file_path = json_file_path
-        self.dicts_list = []
-    
-    def split_json_to_dicts(self, region_code):
-        """
-        Splits the JSON file into individual dictionaries.
-
-        Parameters:
-        region_code (str): Indicates which country's stock information will be processed
-
-        Returns:
-        List[dict]: A list of dictionaries extracted from the JSON file.
-        """
-        with open(self.json_file_path, 'r') as json_file:
-            data = json.load(json_file)[region_code]
-        
-        self.dicts_list = [value for value in data.values()]
-        return self.dicts_list
-    
-    def filter_valid_entries(self):
-        """
-        Filters the previously split dictionaries, keeping only those where 
-        the 'valid' key is set to True.
-        
-        Returns:
-        List[dict]: A list of dictionaries where 'valid' is True.
-        """
-        if not self.dicts_list:
-            raise ValueError("No dictionaries to filter. Please run split_json_to_dicts() first.")
-        
-        filtered_dicts = [d for d in self.dicts_list if d.get('valid')]
-        return filtered_dicts
-
-
 # an async version of StockFetcher. 
 # by requesting the information for each stock at the same time, the exectuing time will be shorten.
 class AsyncStockFetcher:
