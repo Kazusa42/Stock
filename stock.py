@@ -9,11 +9,11 @@
 
 import warnings
 import asyncio
-import json
+import os
+import sys
 
 import pandas as pd
 
-from pathlib import Path
 from datetime import datetime
 
 from utils import AsyncStockFetcher, Const, JsonDataProcessor
@@ -25,6 +25,31 @@ warnings.simplefilter(action=r'ignore', category=FutureWarning)
 
 #---------------------------------------------------------------------------------
 # FUNCTIONS DEFINE
+
+def get_output_directory(output_dir_name=r'interest_stock') -> str:
+    """
+    Get the base directory of the current executable or script 
+    and ensure the existence of an output folder.
+    
+    Returns:
+        str: The path to the output directory.
+    """
+    
+    # Determine if the script is running from a packaged executable or in development mode
+    if getattr(sys, 'frozen', False):
+        # The application is running from a packaged executable
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        # The application is running in a development environment (script mode)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Create the output directory within the base directory if it doesn't exist
+    output_dir = os.path.join(base_dir, output_dir_name)
+    os.makedirs(output_dir, exist_ok=True)  # This will create the directory if it doesn't exist
+
+    return output_dir
+
+
 
 async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str):
     """
@@ -80,14 +105,14 @@ if __name__ == '__main__':
     Const.REGION_CODE = r'CN'
 
     # Path to the configuration JSON file
-    Const.CONFIG_FILE = str(Path(__file__).resolve().parent / 'config.json')
+    Const.CONFIG_FILE = str(os.path.dirname(__file__) + '/config.json')
 
     # Path to the CSV file containing all stock codes
-    Const.STOCKCODE_FILE = str(Path(__file__).resolve().parent / 'stock_code.csv')
+    Const.STOCKCODE_FILE = str(os.path.dirname(__file__) + '/stock_code.csv')
 
     # Path to the output CSV file that will contain stock codes meeting all requirements (thresholds)
-    Const.RESULT_FILE = str(Path(__file__).resolve().parent / 'interest_stock' / 
-                            f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv")
+    curr_dir = get_output_directory()
+    Const.RESULT_FILE =  curr_dir + f"/{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv"
 
     # END OF CONST VARIABLES DEFINITION
     #---------------------------------------------------------------------------------
