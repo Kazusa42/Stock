@@ -10,7 +10,7 @@ class StockFetcherGUI:
         """
         A class to create a graphical user interface (GUI) for fetching stock information.
 
-        The GUI is built using the tkinter library and provides an iOS-like appearance. 
+        The GUI is built using the tkinter library and provides a terminal-like appearance. 
         The interface allows the user to:
     
         - Select an output directory where the fetched stock data will be saved.
