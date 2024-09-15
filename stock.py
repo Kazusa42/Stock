@@ -74,7 +74,7 @@ def get_output_directory(output_dir_name=r'interest_stock') -> str:
     return output_dir
 
 
-async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str):
+async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str, progress_callback=None):
     """
     A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
 
@@ -102,7 +102,8 @@ async def async_routine(stock_code_path: str, config_path: str, region_code: str
         stock_list=stock_code_list,
         interest_info_idxs=interest_info_idxs,
         thresholds=thresholds,
-        urls=urls
+        urls=urls,
+        progress_callback=progress_callback
     )
 
     # Asynchronously fetch the stock data

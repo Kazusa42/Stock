@@ -1,8 +1,9 @@
 import tkinter as tk
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, ttk
 import threading
-import stock  # Ensure stock.py and gui.py are in the same directory
 import time
+
+import stock  # Ensure stock.py and gui.py are in the same directory
 
 class StockFetcherGUI:
     def __init__(self, root):
@@ -29,14 +30,13 @@ class StockFetcherGUI:
         """
         self.root = root
         self.root.title("Stock Information Fetcher")
-        self.root.geometry("400x250")
-        self.root.resizable(False, False)
+        self.root.geometry("600x400")
 
         # Configure the window style to resemble iOS
-        self.root.configure(bg="#f0f0f0")
+        self.root.configure(bg="black")
 
         # Title label
-        self.title_label = tk.Label(root, text="Stock Information Fetcher", font=("Helvetica", 16), bg="#f0f0f0")
+        self.title_label = tk.Label(root, text="Stock Information Fetcher", font=("Consolas", 24), fg="green", bg="black")
         self.title_label.pack(pady=10)
 
         # Output directory selection
@@ -47,27 +47,25 @@ class StockFetcherGUI:
             root,
             text="Choose Output Directory",
             command=self.choose_output_dir,
-            bg="#007AFF",
-            fg="white",
-            activebackground="#0051a8",
-            activeforeground="white"
+            font=("Consolas", 12),
+            fg="black",
+            bg="green",
+            relief="flat",
+            borderwidth=1
         )
         self.output_button.pack(pady=5)
 
-        self.output_label = tk.Label(root, textvariable=self.output_dir, bg="#f0f0f0")
+        self.output_label = tk.Label(root, textvariable=self.output_dir, font=("Consolas", 12), fg="green", bg="black")
         self.output_label.pack()
 
         # Progress bar
-        self.progress = tk.IntVar()
-        self.progress_bar = tk.Scale(
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(
             root,
-            from_=0,
-            to=100,
-            orient=tk.HORIZONTAL,
-            length=300,
-            variable=self.progress,
-            state='disabled',
-            bg="#f0f0f0"
+            orient="horizontal",
+            length=400,
+            mode="determinate",
+            variable=self.progress_var
         )
         self.progress_bar.pack(pady=10)
 
@@ -76,13 +74,28 @@ class StockFetcherGUI:
             root,
             text="Start Fetching",
             command=self.start_fetching,
-            width=20,
-            bg="#34C759",
-            fg="white",
-            activebackground="#28a745",
-            activeforeground="white"
+            font=("Consolas", 12),
+            fg="black",
+            bg="green",
+            relief="flat",
+            borderwidth=1
         )
         self.start_button.pack(pady=10)
+
+        self.message_box = tk.Text(
+            root,
+            height=10,
+            width=60,
+            borderwidth=2,
+            highlightcolor="white",
+            highlightbackground="white",
+            font=("Consolas", 10),
+            fg="green",
+            bg="white",
+            relief="flat",
+            state="disabled"
+        )
+        self.message_box.pack(pady=10)
 
     def choose_output_dir(self):
         """
@@ -104,8 +117,8 @@ class StockFetcherGUI:
         # Disable buttons and enable progress bar
         self.start_button.config(state=tk.DISABLED)
         self.output_button.config(state=tk.DISABLED)
-        self.progress_bar.config(state='normal')
-        self.progress.set(0)
+        # self.progress_bar.config(state='normal')
+        self.progress_var.set(0.00)
 
         # Start the fetching process in a separate thread to avoid blocking the GUI
         threading.Thread(target=self.run_fetch).start()
@@ -135,8 +148,8 @@ class StockFetcherGUI:
             # Re-enable buttons and disable the progress bar
             self.start_button.config(state=tk.NORMAL)
             self.output_button.config(state=tk.NORMAL)
-            self.progress_bar.config(state='disabled')
-            self.progress.set(0)
+            # self.progress_bar.config(state='disabled')
+            self.progress_var.set(0)
 
     def update_progress(self, value):
         """
@@ -145,7 +158,7 @@ class StockFetcherGUI:
         Args:
             value (int): The new value for the progress bar.
         """
-        self.root.after(0, lambda: self.progress.set(value))
+        self.root.after(0, lambda: self.progress_var.set(value))
 
     def show_message(self, title, message):
         """
@@ -155,7 +168,10 @@ class StockFetcherGUI:
             title (str): The title of the message box.
             message (str): The message to display.
         """
-        self.root.after(0, lambda: messagebox.showinfo(title, message))
+        self.message_box.config(state="normal")
+        self.message_box.insert(tk.END, f"[INFO:] {message}\n")
+        self.message_box.config(state="disabled")
+        self.message_box.see(tk.END)
 
 
 if __name__ == "__main__":

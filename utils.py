@@ -130,7 +130,7 @@ class AsyncStockFetcher:
         filter_data(): Filter the fetched stock data based on defined thresholds.
         save_data(save_path): Save the filtered data to a CSV file.
     """
-    def __init__(self, stock_list, interest_info_idxs, thresholds, urls) -> None:
+    def __init__(self, stock_list, interest_info_idxs, thresholds, urls, progress_callback=None) -> None:
         self._stock_list = stock_list
         self._interest_info_idxs = interest_info_idxs
         self._thresholds = thresholds
@@ -139,6 +139,10 @@ class AsyncStockFetcher:
 
         # Initialize an empty DataFrame to store the results
         self.results = pd.DataFrame()
+
+        # Callback function
+        self.progress_callback = progress_callback
+        self.total_stocks = len(stock_list)
 
     async def _fetch_stock_data(self, session, stock_code: str):
         """Fetch stock data for a given stock code asynchronously."""
@@ -172,10 +176,21 @@ class AsyncStockFetcher:
                 return None
 
     async def fetch_data(self):
-        """Fetch data for all stocks in the list asynchronously."""
+        """Fetch data for all stocks in the list asynchronously and update progress."""
+        fetched_count = 0
+
         async with aiohttp.ClientSession() as session:
-            tasks = [self._fetch_stock_data(session, stock_code) for stock_code in self._stock_list]
-            results = await asyncio.gather(*tasks)
+            task_list = []
+            for stock_code in self._stock_list:
+                task = self._fetch_stock_data(session, stock_code)
+                task_list.append(task)
+                fetched_count += 1
+
+                if self.progress_callback:
+                    progress = fetched_count / self.total_stocks * 100
+                    self.progress_callback(progress)
+            
+            results = await asyncio.gather(*task_list)
             self._all_data = [res for res in results if res is not None]
 
     def filter_data(self):
