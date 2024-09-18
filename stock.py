@@ -24,7 +24,27 @@ from utils import AsyncStockFetcher, Const, JsonDataProcessor
 warnings.simplefilter(action=r'ignore', category=FutureWarning)
 
 #---------------------------------------------------------------------------------
-# FUNCTIONS DEFINE
+# DEFINE GLOBAL VARIABLES HERE
+
+# default output directory name
+_output_dir_name = 'interest_stock'
+
+# END OF GLOBAL VARIABLES' DEFINITION
+#---------------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------------
+# DEFINE FUNCTIONS HERE
+
+def set_output_directory(output_dir_path: str):
+    """
+    Sets the path for the output directory.
+
+    Args:
+        output_dir_path (str): The path where the output directory will be located.
+    """
+    global _output_dir_name
+    _output_dir_name = output_dir_path
+
 
 def get_output_directory(output_dir_name=r'interest_stock') -> str:
     """
@@ -43,15 +63,18 @@ def get_output_directory(output_dir_name=r'interest_stock') -> str:
         # The application is running in a development environment (script mode)
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
+    if os.path.isabs(_output_dir_name):
+        output_dir = _output_dir_name
+    else:
+        output_dir = os.path.join(base_dir, _output_dir_name)
+
     # Create the output directory within the base directory if it doesn't exist
-    output_dir = os.path.join(base_dir, output_dir_name)
-    os.makedirs(output_dir, exist_ok=True)  # This will create the directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
 
     return output_dir
 
 
-
-async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str):
+async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str, progress_callback=None):
     """
     A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
 
@@ -79,7 +102,8 @@ async def async_routine(stock_code_path: str, config_path: str, region_code: str
         stock_list=stock_code_list,
         interest_info_idxs=interest_info_idxs,
         thresholds=thresholds,
-        urls=urls
+        urls=urls,
+        progress_callback=progress_callback
     )
 
     # Asynchronously fetch the stock data
@@ -92,11 +116,44 @@ async def async_routine(stock_code_path: str, config_path: str, region_code: str
     fetcher.save_data(save_path)
 
 
+def run_fetching(progress_callback=None):
+    """
+    Executes the asynchronous stock fetching routine.
+
+    This function:
+    - Configures the necessary paths for the configuration and stock code files.
+    - Sets the path for the output CSV file.
+    - Initiates and runs the asynchronous `async_routine` to fetch, process, and save stock data.
+
+    It is designed to be called from the GUI or other interfaces that need to start the fetching process.
+    """
+
+    # Define the region code for data extraction
+    Const.REGION_CODE = 'CN'
+
+    # Define the paths for the configuration JSON file and the stock codes CSV file
+    Const.CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
+    Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
+
+    # Define the path for the output CSV file
+    output_directory = get_output_directory()
+    Const.RESULT_FILE = os.path.join(output_directory, f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv")
+
+    # Run the asynchronous routine to fetch and process the stock data
+    asyncio.run(async_routine(
+        stock_code_path=Const.STOCKCODE_FILE,
+        config_path=Const.CONFIG_FILE,
+        region_code=Const.REGION_CODE,
+        save_path=Const.RESULT_FILE,
+        progress_callback=progress_callback
+    ))
+
+
 # END OF FUNCTIONS DEFINE
 #---------------------------------------------------------------------------------
 
 
-if __name__ == '__main__':
+"""if __name__ == '__main__':
     #---------------------------------------------------------------------------------
     # CONST VARIABLES ARE DEFINED HERE
     # THESE VARIABLES SHOULD NOT BE MODIFIED WITHOUT AUTHOR'S PERMISSION
@@ -132,4 +189,4 @@ if __name__ == '__main__':
     #---------------------------------------------------------------------------------
 
     # END OF FILE
-    #---------------------------------------------------------------------------------
+    #---------------------------------------------------------------------------------"""
