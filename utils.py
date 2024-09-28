@@ -188,8 +188,8 @@ class AsyncStockFetcher:
                     raw_data = information['data'][stock_code]['qt'][stock_code]
 
                     selected_data = [raw_data[idx['index']] for idx in self._interest_info_idxs.values()]
-                    selected_data[0] = stock_code
-                    selected_data[1:] = list(map(float, selected_data[1:]))
+                    selected_data[1] = stock_code
+                    selected_data[2:] = list(map(float, selected_data[2:]))
                     return selected_data
                 except (KeyError, ValueError, json.JSONDecodeError) as e:
                     print(f"Error processing data for stock {stock_code}: {e}")
