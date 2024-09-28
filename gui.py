@@ -1,7 +1,8 @@
 import tkinter as tk
-from tkinter import messagebox, filedialog, ttk
+from tkinter import filedialog, ttk
 import threading
-import time
+
+from datetime import datetime
 
 import stock  # Ensure stock.py and gui.py are in the same directory
 
@@ -58,6 +59,30 @@ class StockFetcherGUI:
         self.output_label = tk.Label(root, textvariable=self.output_dir, font=("Consolas", 14), fg="green", bg="black")
         self.output_label.pack()
 
+        # Start fetching button
+        self.start_button = tk.Button(
+            root,
+            text="Start Fetching",
+            command=self.start_fetching,
+            font=("Consolas", 18),
+            fg="black",
+            bg="green",
+            relief="flat",
+            borderwidth=1
+        )
+        self.start_button.pack(pady=10)
+
+        # Progress bar
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(
+            root,
+            orient="horizontal",
+            length=700,
+            mode="determinate",
+            variable=self.progress_var
+        )
+        self.progress_bar.pack(pady=10)
+
         # Message box
         self.message_box = tk.Text(
             root,
@@ -72,45 +97,14 @@ class StockFetcherGUI:
             relief="flat",
             state="disabled"
         )
-        # self.message_box.pack(fill=tk.X * 0.6, pady=10)
-        self.message_box.place(x=0, y=0)
-
-        # Progress bar
-        self.progress_var = tk.DoubleVar()
-        self.progress_bar = ttk.Progressbar(
-            root,
-            orient="horizontal",
-            length=700,
-            mode="determinate",
-            variable=self.progress_var
-        )
-        # self.progress_bar.pack(fill=tk.X * 0.6, pady=10)
-        self.progress_bar.place(x=0, y=0)
-
+        self.message_box.pack(pady=10)
         self.message_box.bind("<Configure>", self.update_widget_length)
-
-        # Start fetching button
-        self.start_button = tk.Button(
-            root,
-            text="Start Fetching",
-            command=self.start_fetching,
-            font=("Consolas", 18),
-            fg="black",
-            bg="green",
-            relief="flat",
-            borderwidth=1
-        )
-        self.start_button.pack(pady=10)
 
         self.progress_callback = lambda x : self.update_progress(x)
 
     def update_widget_length(self, event):
-        window_width = self.root.winfo_width()
-        widget_width = int(window_width * 0.7) 
-        
-        x_pos = (window_width - widget_width) // 2
-        self.message_box.place(x=x_pos, y=50, width=widget_width)
-        self.progress_bar.place(x=x_pos, y=200, width=widget_width)
+        text_width = self.message_box.winfo_width()
+        self.progress_bar.config(length=text_width)
     
     def choose_output_dir(self):
         """
@@ -118,6 +112,7 @@ class StockFetcherGUI:
         """
         directory = filedialog.askdirectory()
         if directory:
+            self.show_message("System", f"Set output directory to {directory}.")
             self.output_dir.set(directory)
 
     def start_fetching(self):
@@ -136,6 +131,8 @@ class StockFetcherGUI:
         self.progress_var.set(0.00)
 
         # Start the fetching process in a separate thread to avoid blocking the GUI
+        self.message_box.insert(tk.END, f"Start fetching stock data at {datetime.now().strftime('%Y-%m-%d_%H_%M')}...\n")
+        self.message_box.see(tk.END)
         threading.Thread(target=self.run_fetch).start()
 
     def run_fetch(self):
@@ -168,7 +165,9 @@ class StockFetcherGUI:
         Args:
             value (int): The new value for the progress bar.
         """
-        self.root.after(0, lambda: self.progress_var.set(value))
+        # self.root.after(0, lambda: self.progress_var.set(value))
+        self.progress_bar['value'] = value
+        self.root.update_idletasks()
 
     def show_message(self, title, message):
         """
