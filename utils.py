@@ -143,12 +143,13 @@ class AsyncStockFetcher:
         # Callback function
         self.progress_callback = progress_callback
         self.total_stocks = len(stock_list)
-
+    
+    """ FOR DEVELOPMENT ONLY """
+    # THIS PART OF CODE SHOULD NEVER BE VIWED BY USER
+    # THE ONLY USAGE OF THIS FUNCTION IS TO CHECK THE RAW DATA STRUCTURE
     @property
     def _unit_test(self):
-        """ FOR DEVELOPMENT ONLY """
-        # THIS PART OF CODE SHOULD NEVER BE VIWED BY USER
-        # THE ONLY USAGE OF THIS FUNCTION IS TO CHECK THE RAW DATA STRUCTURE
+        
         _test_stock_code = self._stock_list[0]
         _test_url = f"{self._urls['request']['prefix']}{_test_stock_code}{self._urls['request']['suffix']}"
 
@@ -166,55 +167,74 @@ class AsyncStockFetcher:
             urls=test_urls,
         )
         _test_tester._unit_test
+    """ END OF DEVELOPMENT CODE """
 
-    async def _fetch_stock_data(self, session, stock_code: str):
+    async def _fetch_stock_data(self, session, stock_code: str, semaphore: asyncio.Semaphore, retry_limit=3):
         """ Fetch stock data for a given stock code asynchronously. """
         url = f"{self._urls['request']['prefix']}{stock_code}{self._urls['request']['suffix']}"
-        async with session.get(url, headers=self._urls['request']['headers'], allow_redirects=True) as response:
-            if 300 <= response.status < 400:
-                print(f'Warning: Request for stock {stock_code} was redirected.')
-                return None
-            elif response.status == 403:
-                print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
-                return None
-            elif response.status == 200:
-                text = await response.text()
-                if self._urls['firewallWarning']['text'] in text:
-                    print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
-                    return None
-                
+        # using semaphores to control concurrency
+        async with semaphore:
+            retries = 0
+            while retries < retry_limit:
                 try:
-                    information = json.loads(text)
-                    raw_data = information['data'][stock_code]['qt'][stock_code]
+                    async with session.get(url, headers=self._urls['request']['headers'], allow_redirects=True) as response:
+                        if 300 <= response.status < 400:
+                            print(f'Warning: Request for stock {stock_code} was redirected.')
+                            return None
+                        elif response.status == 403:
+                            print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
+                            return None
+                        elif response.status == 200:
+                            text = await response.text()
+                            if self._urls['firewallWarning']['text'] in text:
+                                print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
+                                return None
+                            
+                            try:
+                                information = json.loads(text)
+                                raw_data = information['data'][stock_code]['qt'][stock_code]
 
-                    selected_data = [raw_data[idx['index']] for idx in self._interest_info_idxs.values()]
-                    selected_data[1] = stock_code
-                    selected_data[2:] = list(map(float, selected_data[2:]))
-                    return selected_data
-                except (KeyError, ValueError, json.JSONDecodeError) as e:
-                    print(f"Error processing data for stock {stock_code}: {e}")
-                    return None
-            else:
-                print(f"Error: Request for stock {stock_code} failed with status {response.status}.")
-                return None
+                                selected_data = [raw_data[idx['index']] for idx in self._interest_info_idxs.values()]
+                                selected_data[1] = stock_code
+                                selected_data[2:] = list(map(float, selected_data[2:]))
+                                return selected_data
+                            except (KeyError, ValueError, json.JSONDecodeError) as e:
+                                print(f"Error processing data for stock {stock_code}: {e}")
+                                return None
+                        else:
+                            print(f"Error: Request for stock {stock_code} failed with status {response.status}.")
+                            return None
+                except aiohttp.ClientError as e:
+                    print(f"Client error: {e}")
+                    retries += 1
+                    await asyncio.sleep(2 ** retries)  # Exponential backoff
+                    continue  # re-try
+            return None
 
     async def fetch_data(self):
         """Fetch data for all stocks in the list asynchronously and update progress."""
-        fetched_count = 0
+        fetched_count = 0  # number of stocks processed (get response)
+        max_concurrent_requests = 5  # maximum concurrency of requests
+        semaphore = asyncio.Semaphore(max_concurrent_requests)  # limiting the number of concurrent requests with semaphores
 
         async with aiohttp.ClientSession() as session:
             task_list = []
             for stock_code in self._stock_list:
-                task = self._fetch_stock_data(session, stock_code)
+                task = self._fetch_stock_data(session, stock_code, semaphore)
                 task_list.append(task)
+            
+            # gather results and update progress after each task finishes
+            for result in asyncio.as_completed(task_list):
+                fetched_data = await result
+                if fetched_data:
+                    self._all_data.append(fetched_data)
+                
+                # update progress
                 fetched_count += 1
 
                 if self.progress_callback:
                     progress = fetched_count / self.total_stocks * 100
                     self.progress_callback(progress)
-            
-            results = await asyncio.gather(*task_list)
-            self._all_data = [res for res in results if res is not None]
 
     def filter_data(self):
         """Filter the fetched stock data based on defined thresholds."""
@@ -225,7 +245,10 @@ class AsyncStockFetcher:
 
     def save_data(self, save_path: str):
         """Save the filtered data to a CSV file."""
-        self.results.to_csv(save_path, index=False)
+        try:
+            self.results.to_csv(save_path, index=False, encoding='utf-8-sig')
+        except Exception as e:
+            print(f"Error saving data: {e}")
 
 # END OF CLASS DEFINITION
 #---------------------------------------------------------------------------------

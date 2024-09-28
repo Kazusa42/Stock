@@ -31,32 +31,44 @@ class StockFetcherGUI:
         """
         self.root = root
         self.root.title("Stock Information Fetcher")
-        self.root.geometry("1000x600")
+        self.root.geometry("1000x700")
 
         # Configure the window style to resemble iOS
         self.root.configure(bg="black")
 
         # Title label
-        self.title_label = tk.Label(root, text="Stock Information Fetcher", font=("Consolas", 32), fg="green", bg="black")
+        self.title_label = tk.Label(
+            root,
+            text="Stock Information Fetcher",
+            font=("JetBrains Mono Light", 32),
+            fg="dark green",
+            bg="black",
+        )
         self.title_label.pack(pady=10)
 
         # Output directory selection
         self.output_dir = tk.StringVar()
-        self.output_dir.set("Choose output directory")
+        self.output_dir.set("Output directory is: ")
 
         self.output_button = tk.Button(
             root,
             text="Choose Output Directory",
             command=self.choose_output_dir,
-            font=("Consolas", 18),
+            font=("JetBrains Mono Thin", 18),
             fg="black",
-            bg="green",
+            bg="dark green",
             relief="flat",
-            borderwidth=1
+            borderwidth=1,
         )
         self.output_button.pack(pady=5)
 
-        self.output_label = tk.Label(root, textvariable=self.output_dir, font=("Consolas", 14), fg="green", bg="black")
+        self.output_label = tk.Label(
+            root,
+            textvariable=self.output_dir,
+            font=("JetBrains Mono Thin", 14),
+            fg="dark green",
+            bg="black",
+        )
         self.output_label.pack()
 
         # Start fetching button
@@ -64,11 +76,11 @@ class StockFetcherGUI:
             root,
             text="Start Fetching",
             command=self.start_fetching,
-            font=("Consolas", 18),
+            font=("JetBrains Mono Thin", 18),
             fg="black",
-            bg="green",
+            bg="dark green",
             relief="flat",
-            borderwidth=1
+            borderwidth=1,
         )
         self.start_button.pack(pady=10)
 
@@ -79,7 +91,7 @@ class StockFetcherGUI:
             orient="horizontal",
             length=700,
             mode="determinate",
-            variable=self.progress_var
+            variable=self.progress_var,
         )
         self.progress_bar.pack(pady=10)
 
@@ -87,15 +99,16 @@ class StockFetcherGUI:
         self.message_box = tk.Text(
             root,
             height=20,
-            width=70,
-            borderwidth=2,
+            width=80,
+            bd=5,
             highlightcolor="white",
             highlightbackground="white",
-            font=("Consolas", 12),
-            fg="green",
-            bg="white",
+            insertbackground="white",
+            font=("JetBrains Mono Thin", 12),
+            fg="dark green",
+            bg="black",
             relief="flat",
-            state="disabled"
+            state="disabled",
         )
         self.message_box.pack(pady=10)
         self.message_box.bind("<Configure>", self.update_widget_length)
@@ -120,7 +133,7 @@ class StockFetcherGUI:
         Disables the 'Start Fetching' button, disables the output directory button, 
         enables the progress bar, and starts the fetching process in a new thread.
         """
-        if self.output_dir.get() == "Choose output directory":
+        if self.output_dir.get() == "Output directory is: ":
             self.show_message("Warning", "Please select an output directory first.")
             return
 
@@ -142,7 +155,7 @@ class StockFetcherGUI:
             stock.set_output_directory(self.output_dir.get())
 
             # Run the data fetching process
-            self.show_message("System", f"Start fetching stock data at {datetime.now().strftime('%Y-%m-%d_%H_%M')}...\n")
+            self.show_message("System", f"Start fetching stock data at {datetime.now().strftime('%Y-%m-%d_%H_%M')}...")
             stock.run_fetching(progress_callback=self.progress_callback)
 
             # Notify the user upon successful completion
