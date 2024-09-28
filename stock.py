@@ -153,7 +153,7 @@ def run_fetching(progress_callback=None):
 #---------------------------------------------------------------------------------
 
 
-"""if __name__ == '__main__':
+if __name__ == '__main__':
     #---------------------------------------------------------------------------------
     # CONST VARIABLES ARE DEFINED HERE
     # THESE VARIABLES SHOULD NOT BE MODIFIED WITHOUT AUTHOR'S PERMISSION

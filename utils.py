@@ -146,8 +146,8 @@ class AsyncStockFetcher:
 
     async def _fetch_stock_data(self, session, stock_code: str):
         """Fetch stock data for a given stock code asynchronously."""
-        url = f"{self._urls['search']['prefix']}{stock_code}{self._urls['search']['suffix']}"
-        async with session.get(url, allow_redirects=True) as response:
+        url = f"{self._urls['request']['prefix']}{stock_code}{self._urls['request']['suffix']}"
+        async with session.get(url, headers=self._urls['request']['headers'], allow_redirects=True) as response:
             if 300 <= response.status < 400:
                 print(f'Warning: Request for stock {stock_code} was redirected.')
                 return None
