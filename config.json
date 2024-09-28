@@ -1,6 +1,10 @@
 {
     "CN": {
         "infoIdxs": {
+            "stockName": {
+                "index": 1,
+                "valid": true
+            },
             "stockCode": {
                 "index": 2,
                 "valid": true
@@ -78,8 +82,7 @@
             "firewallWarning": {
                 "text": "window.location.href=\"https://waf.tencent.com/501page.html?u=",
                 "valid": true
-            }
-            
+            }   
         }
     }
 }

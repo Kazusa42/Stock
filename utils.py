@@ -144,8 +144,31 @@ class AsyncStockFetcher:
         self.progress_callback = progress_callback
         self.total_stocks = len(stock_list)
 
+    @property
+    def _unit_test(self):
+        """ FOR DEVELOPMENT ONLY """
+        # THIS PART OF CODE SHOULD NEVER BE VIWED BY USER
+        # THE ONLY USAGE OF THIS FUNCTION IS TO CHECK THE RAW DATA STRUCTURE
+        _test_stock_code = self._stock_list[0]
+        _test_url = f"{self._urls['request']['prefix']}{_test_stock_code}{self._urls['request']['suffix']}"
+
+        import requests
+        _test_response = requests.get(url=_test_url, headers=self._urls['request']['headers'], allow_redirects=True)
+        _test_raw_data = json.loads(_test_response.content)
+        print(_test_raw_data['data'][_test_stock_code]['qt'][_test_stock_code])
+
+    @classmethod
+    def run_unit_test(cls, test_code_list, test_urls):
+        _test_tester = cls(
+            stock_list=test_code_list,
+            interest_info_idxs=None,
+            thresholds=None,
+            urls=test_urls,
+        )
+        _test_tester._unit_test
+
     async def _fetch_stock_data(self, session, stock_code: str):
-        """Fetch stock data for a given stock code asynchronously."""
+        """ Fetch stock data for a given stock code asynchronously. """
         url = f"{self._urls['request']['prefix']}{stock_code}{self._urls['request']['suffix']}"
         async with session.get(url, headers=self._urls['request']['headers'], allow_redirects=True) as response:
             if 300 <= response.status < 400:
@@ -205,6 +228,26 @@ class AsyncStockFetcher:
         self.results.to_csv(save_path, index=False)
 
 # END OF CLASS DEFINITION
+#---------------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------------
+# UNIT TEST, DEVELOPMENT USE ONLY
+# RUN THE BLOW CODE TO PRINT RAW DATA STRUCTURE
+
+if __name__ == '__main__':
+
+    import os
+    Const.CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
+    
+    processor = JsonDataProcessor()
+    _, _, urls = processor.split_json_to_dicts(Const.CONFIG_FILE, 'CN')
+    
+    AsyncStockFetcher.run_unit_test(
+        test_code_list=['sh603233'], 
+        test_urls=urls
+    )
+
+# END OF UNIT TEST
 #---------------------------------------------------------------------------------
 
 # END OF FILE

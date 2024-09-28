@@ -131,8 +131,6 @@ class StockFetcherGUI:
         self.progress_var.set(0.00)
 
         # Start the fetching process in a separate thread to avoid blocking the GUI
-        self.message_box.insert(tk.END, f"Start fetching stock data at {datetime.now().strftime('%Y-%m-%d_%H_%M')}...\n")
-        self.message_box.see(tk.END)
         threading.Thread(target=self.run_fetch).start()
 
     def run_fetch(self):
@@ -144,6 +142,7 @@ class StockFetcherGUI:
             stock.set_output_directory(self.output_dir.get())
 
             # Run the data fetching process
+            self.show_message("System", f"Start fetching stock data at {datetime.now().strftime('%Y-%m-%d_%H_%M')}...\n")
             stock.run_fetching(progress_callback=self.progress_callback)
 
             # Notify the user upon successful completion
@@ -165,9 +164,7 @@ class StockFetcherGUI:
         Args:
             value (int): The new value for the progress bar.
         """
-        # self.root.after(0, lambda: self.progress_var.set(value))
-        self.progress_bar['value'] = value
-        self.root.update_idletasks()
+        self.root.after(0, lambda: self.progress_var.set(value))
 
     def show_message(self, title, message):
         """
