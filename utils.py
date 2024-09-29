@@ -108,7 +108,7 @@ class JsonDataProcessor:
         urls = self.filter_valid(dicts_list[2])
 
         return interest_info_idxs, thresholds, urls
-
+    
 
 class AsyncStockFetcher:
     """
@@ -130,15 +130,10 @@ class AsyncStockFetcher:
         filter_data(): Filter the fetched stock data based on defined thresholds.
         save_data(save_path): Save the filtered data to a CSV file.
     """
-    def __init__(self, stock_list, interest_info_idxs, thresholds, urls, progress_callback=None) -> None:
+    def __init__(self, stock_list, urls, progress_callback=None) -> None:
         self._stock_list = stock_list
-        self._interest_info_idxs = interest_info_idxs
-        self._thresholds = thresholds
         self._urls = urls
-        self._all_data = []
-
-        # Initialize an empty DataFrame to store the results
-        self.results = pd.DataFrame()
+        self._all_raw_data = []
 
         # Callback function
         self.progress_callback = progress_callback
@@ -162,8 +157,6 @@ class AsyncStockFetcher:
     def run_unit_test(cls, test_code_list, test_urls):
         _test_tester = cls(
             stock_list=test_code_list,
-            interest_info_idxs=None,
-            thresholds=None,
             urls=test_urls,
         )
         _test_tester._unit_test
@@ -193,11 +186,22 @@ class AsyncStockFetcher:
                             try:
                                 information = json.loads(text)
                                 raw_data = information['data'][stock_code]['qt'][stock_code]
+                                
+                                # ***************************************************************************************************
+                                # PRE-PROCESSING OF RAW DATA
+                                # THIS PART OF CODE IS FRAGILE
 
-                                selected_data = [raw_data[idx['index']] for idx in self._interest_info_idxs.values()]
-                                selected_data[1] = stock_code
-                                selected_data[2:] = list(map(float, selected_data[2:]))
-                                return selected_data
+                                # stock code w/o prefix is placed at the 3rd place of raw data list
+                                # so the sub index of stock_code is 2 (sub index starts from 0)
+                                raw_data[2] = stock_code
+                                # all original value in raw data is string
+                                # map all number-type data into float type
+                                raw_data[3:] = [float(item) if item.replace('.', '', 1).isdigit() else item for item in raw_data[3:]]
+
+                                # END OF PRE-PROCESSING OF RAW DATA
+                                # ***************************************************************************************************
+
+                                return raw_data
                             except (KeyError, ValueError, json.JSONDecodeError) as e:
                                 print(f"Error processing data for stock {stock_code}: {e}")
                                 return None
@@ -208,7 +212,7 @@ class AsyncStockFetcher:
                     print(f"Client error: {e}")
                     retries += 1
                     await asyncio.sleep(2 ** retries)  # Exponential backoff
-                    continue  # re-try
+                    continue  # retry
             return None
 
     async def fetch_data(self):
@@ -227,29 +231,66 @@ class AsyncStockFetcher:
             for result in asyncio.as_completed(task_list):
                 fetched_data = await result
                 if fetched_data:
-                    self._all_data.append(fetched_data)
+                    self._all_raw_data.append(fetched_data)
                 
-                # update progress
+                # update the number of stocks which already received response
                 fetched_count += 1
 
                 if self.progress_callback:
                     progress = fetched_count / self.total_stocks * 100
                     self.progress_callback(progress)
 
-    def filter_data(self):
-        """Filter the fetched stock data based on defined thresholds."""
-        self.results = pd.DataFrame(self._all_data, columns=list(self._interest_info_idxs.keys()))
+    def save_data(self, save_path: str):
+        """Save the filtered data to a CSV file."""
+        try:
+            df = pd.DataFrame(self._all_raw_data)
+            df.to_csv(save_path, index=False, header=None, encoding='utf-8-sig')
+        except Exception as e:
+            print(f"Error saving data: {e}")
+
+
+class StockFilter:
+    """
+    StockFilter reads raw stock data from CSV, filters columns based on interest_info_idxs, 
+    and filters rows based on thresholds.
+    """
+    def __init__(self, interest_info_idxs, thresholds) -> None:
+        self._interest_info_idxs = interest_info_idxs
+        self._thresholds = thresholds
+        self.results = pd.DataFrame()
+    
+    def load_data(self, raw_data_path: str):
+        """Load the raw stock data from a CSV file into a pandas DataFrame."""
+        try:
+            df = pd.read_csv(raw_data_path)
+            return df
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            return pd.DataFrame()
+
+    def filter_interested_value(self, df: pd.DataFrame):
+        """Filter the DataFrame to keep only the columns of interest."""
+        columns_to_keep = [idx['index'] for idx in self._interest_info_idxs.values()]
+        filtered_df = df[columns_to_keep]
+        filtered_df.columns = self._interest_info_idxs.keys()
+        return filtered_df
+
+    def filter_stock(self, df: pd.DataFrame):
+        """Filter rows in the DataFrame based on predefined thresholds."""
+        self.results = df.copy()
         for key, threshold in self._thresholds.items():
             expression = f"{threshold['lower']} <= {key} < {threshold['upper']}"
             self.results.query(expression, inplace=True)
 
-    def save_data(self, save_path: str):
+    def save_filtered_data(self, save_path: str):
         """Save the filtered data to a CSV file."""
         try:
             self.results.to_csv(save_path, index=False, encoding='utf-8-sig')
+            print(f"Filtered data successfully saved to {save_path}")
         except Exception as e:
-            print(f"Error saving data: {e}")
+            print(f"Error saving filtered data: {e}")
 
+    
 # END OF CLASS DEFINITION
 #---------------------------------------------------------------------------------
 

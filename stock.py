@@ -140,13 +140,15 @@ def run_fetching(progress_callback=None):
     Const.RESULT_FILE = os.path.join(output_directory, f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv")
 
     # Run the asynchronous routine to fetch and process the stock data
-    asyncio.run(async_routine(
-        stock_code_path=Const.STOCKCODE_FILE,
-        config_path=Const.CONFIG_FILE,
-        region_code=Const.REGION_CODE,
-        save_path=Const.RESULT_FILE,
-        progress_callback=progress_callback
-    ))
+    asyncio.run(
+        async_routine(
+            stock_code_path=Const.STOCKCODE_FILE,
+            config_path=Const.CONFIG_FILE,
+            region_code=Const.REGION_CODE,
+            save_path=Const.RESULT_FILE,
+            progress_callback=progress_callback
+        )
+    )
 
 
 # END OF FUNCTIONS DEFINE
