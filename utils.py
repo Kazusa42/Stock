@@ -251,9 +251,27 @@ class AsyncStockFetcher:
 
 class StockFilter:
     """
-    StockFilter reads raw stock data from CSV, filters columns based on interest_info_idxs, 
-    and filters rows based on thresholds.
+    StockFilter is a class designed to filter stock data loaded from a CSV file.
+
+    This class takes interest information indices to filter relevant columns and applies 
+    predefined thresholds to filter rows based on stock data. The filtered data can then be 
+    saved to a CSV file.
+
+    Attributes:
+        interest_info_idxs (dict): A dictionary mapping column names to their respective indices
+                                   in the stock data. This is used to filter columns of interest.
+        thresholds (dict): A dictionary containing the filtering thresholds for the stock data.
+                           Keys are column names, and values are dictionaries with 'lower' and 
+                           'upper' bounds for filtering rows.
+
+    Methods:
+        load_data(raw_data_path): Load raw stock data from a CSV file into a pandas DataFrame.
+        filter_columns(df): Filter the DataFrame to retain only the columns of interest based on 
+                            the interest_info_idxs attribute.
+        filter_data(df): Filter the rows of the DataFrame based on the defined thresholds.
+        save_filtered_data(save_path): Save the filtered DataFrame to a CSV file.
     """
+
     def __init__(self, interest_info_idxs, thresholds) -> None:
         self._interest_info_idxs = interest_info_idxs
         self._thresholds = thresholds
