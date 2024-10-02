@@ -4,19 +4,17 @@ import asyncio
 
 from datetime import datetime
 
-from utils import AsyncStockFetcher, Const, JsonDataProcessor
-from stock import get_output_directory
+from utils.component import Const, JsonDataProcessor
 
 # Mock data for testing
 
 Const.REGION_CODE = 'CN'
 
-# Define the paths for the configuration JSON file and the stock codes CSV file
+"""# Define the paths for the configuration JSON file and the stock codes CSV file
 Const.CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
 Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
 
 # Define the path for the output CSV file
-output_directory = get_output_directory()
 Const.RESULT_FILE = os.path.join(output_directory, f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_raw_stock_info.csv")
 
 # Test save path
@@ -61,13 +59,15 @@ async def test_async_stock_fetcher():
         else:
             print(f"Test failed: No data saved to {save_path}.")
     else:
-        print(f"Test failed: File {save_path} was not created.")
+        print(f"Test failed: File {save_path} was not created.")"""
 
 
 # Main test entry point
 if __name__ == '__main__':
     # Run the async test function
-    asyncio.run(test_async_stock_fetcher())
+    # asyncio.run(test_async_stock_fetcher())
+    Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
+    print(datetime.now().strftime('%Y-%m-%d %H:%M'))
 
     # Clean up the test file
     """if os.path.exists(save_path):
