@@ -1,23 +1,30 @@
+# -*- coding:utf-8 -*-
+# !/usr/bin/env python
 #---------------------------------------------------------------------------------
 # Author: Zhang
-# Date: 2024/09/09
 # FOR PERSONAL USE ONLY.
+#
+# Create Date: 2024/09/09
+# Last Update on: 2024/10/03
+#
+# FILE: functions.py
+# Description: functions which will be used in main loop are defined here
 #---------------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------------
 # IMPORT REQUIRED PACKAGES HERE
 
 import warnings
-import asyncio
 import os
 import sys
+import platform
 
 import pandas as pd
 
 from datetime import datetime
 
-from utils import Const, JsonDataProcessor
-from stock import AsyncStockFetcher
+from .component import JsonDataProcessor
+from .stock import AsyncStockFetcher
 
 # END OF PACKAGE IMPORT
 #---------------------------------------------------------------------------------
@@ -36,15 +43,17 @@ _output_dir_name = 'interest_stock'
 #---------------------------------------------------------------------------------
 # DEFINE FUNCTIONS HERE
 
-def set_output_directory(output_dir_path: str):
-    """
-    Sets the path for the output directory.
+def clear_console():
+    if platform.system() == 'Windows':
+        os.system('cls')
+    else:
+        os.system('clear')
 
-    Args:
-        output_dir_path (str): The path where the output directory will be located.
-    """
-    global _output_dir_name
-    _output_dir_name = output_dir_path
+
+def progress_callback(progress):
+    import sys
+    sys.stdout.flush()
+    print(f"Progress: {progress:.2f}%", end='\r')
 
 
 def get_output_directory(output_dir_name=r'interest_stock') -> str:
@@ -75,7 +84,68 @@ def get_output_directory(output_dir_name=r'interest_stock') -> str:
     return output_dir
 
 
-async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str, progress_callback=None):
+def show_start_menu():
+    clear_console()
+    print(f'# ------------------------------------------------------------------------ #')
+    print(f'# Stock information fetcher')
+    print(f'# Author: Kazusa')
+    print(f'# FOR PERSONAL USE ONLY')
+    print(f'#')
+    print(f'# Project created on: 2024/09/09')
+    print(f"# Executing date: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f'#')
+    print(f'# --------------------------- COMMAND LIST ------------------------------- #')
+    print(f'#')
+    print(f'#   get_raw_data:         Start to fetch all stock information')
+    print(f'#   show [stock_code]:    Displaying information about a specified stock ')
+    print(f'#')
+    print(f'# ------------------------------------------------------------------------ #')
+
+
+def initial_program(stock_code_file: str, config_file: str, region_code: str) -> AsyncStockFetcher:
+    """
+    Initializes the stock fetching program by reading stock codes from a CSV file,
+    processing the configuration JSON, and creating an AsyncStockFetcher instance.
+
+    Args:
+        stock_code_file (str): Path to the CSV file containing stock codes.
+        config_file (str): Path to the JSON configuration file.
+        region_code (str): The region code to filter relevant configuration data.
+
+    Returns:
+        AsyncStockFetcher: Initialized asynchronous stock fetcher ready to fetch data.
+    """
+    show_start_menu()
+    try:
+        # Read stock codes from the CSV file
+        df = pd.read_csv(stock_code_file, header=None)
+        stock_code_list = df[df.columns[0]].values.tolist()
+
+        # Process the configuration JSON
+        processor = JsonDataProcessor()
+        interest_info_idxs, thresholds, urls = processor.split_json_to_dicts(config_file, region_code)
+
+        return stock_code_list, interest_info_idxs, thresholds, urls
+    except Exception as e:
+        print(f"An unexpected error occurred - {e}")
+
+
+def stocks_list_to_dict(stocks_list) -> dict:
+    """
+    Convert a 2D list of stock data into a dictionary.
+    
+    :param stocks_list: list of lists, where each row contains stock information, and the second element is the stock code.
+    :return: dict, where the key is the stock code, and the value is the remaining stock information.
+    """
+    stocks_dict = {}
+    for row in stocks_list:
+        stock_code = row[1]  # The second element is the stock code
+        stock_info = row[:1] + row[2:]  # All information except the stock code
+        stocks_dict[stock_code] = stock_info
+    return stocks_dict
+
+
+async def async_fetch_raw_data(fetcher: AsyncStockFetcher, save_path: str) -> dict:
     """
     A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
 
@@ -84,112 +154,18 @@ async def async_routine(stock_code_path: str, config_path: str, region_code: str
     on specified thresholds, and saves the filtered data to a CSV file.
 
     Args:
-        stock_code_path (str): The file path to the CSV file containing stock codes.
-        config_path (str): The file path to the JSON configuration file.
-        region_code (str): The region code used to select data from the JSON file.
+        fetcher (AsyncStockFetcher): The instance of a AsyncStockFetcher class, used to fetch raw data
         save_path (str): The file path to save the filtered stock data as a CSV file.
     """
 
-    # Load stock codes from the CSV file into a list
-    df = pd.read_csv(stock_code_path, header=None)
-    stock_code_list = df[df.columns[0]].values.tolist()
-
-    # Process the JSON configuration file to extract necessary parameters
-    processor = JsonDataProcessor()
-    interest_info_idxs, thresholds, urls = processor.split_json_to_dicts(config_path, region_code)
-
-    # Initialize the AsyncStockFetcher with the stock codes and configuration parameters
-    fetcher = AsyncStockFetcher(
-        stock_list=stock_code_list,
-        interest_info_idxs=interest_info_idxs,
-        thresholds=thresholds,
-        urls=urls,
-        progress_callback=progress_callback
-    )
-
     # Asynchronously fetch the stock data
     await fetcher.fetch_data()
-    
-    # Filter the fetched data based on thresholds
-    fetcher.filter_data()
 
     # Save the filtered data to a CSV file
     fetcher.save_data(save_path)
 
+    db = stocks_list_to_dict(fetcher.all_raw_data)
+    return db
 
-def run_fetching(progress_callback=None):
-    """
-    Executes the asynchronous stock fetching routine.
-
-    This function:
-    - Configures the necessary paths for the configuration and stock code files.
-    - Sets the path for the output CSV file.
-    - Initiates and runs the asynchronous `async_routine` to fetch, process, and save stock data.
-
-    It is designed to be called from the GUI or other interfaces that need to start the fetching process.
-    """
-
-    # Define the region code for data extraction
-    Const.REGION_CODE = 'CN'
-
-    # Define the paths for the configuration JSON file and the stock codes CSV file
-    Const.CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
-    Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
-
-    # Define the path for the output CSV file
-    output_directory = get_output_directory()
-    Const.RESULT_FILE = os.path.join(output_directory, f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv")
-
-    # Run the asynchronous routine to fetch and process the stock data
-    asyncio.run(
-        async_routine(
-            stock_code_path=Const.STOCKCODE_FILE,
-            config_path=Const.CONFIG_FILE,
-            region_code=Const.REGION_CODE,
-            save_path=Const.RESULT_FILE,
-            progress_callback=progress_callback
-        )
-    )
-
-
-# END OF FUNCTIONS DEFINE
-#---------------------------------------------------------------------------------
-
-
-if __name__ == '__main__':
-    #---------------------------------------------------------------------------------
-    # CONST VARIABLES ARE DEFINED HERE
-    # THESE VARIABLES SHOULD NOT BE MODIFIED WITHOUT AUTHOR'S PERMISSION
-    
-    # Setting up the region code, which is used to extract specific data from the config file
-    Const.REGION_CODE = r'CN'
-
-    # Path to the configuration JSON file
-    Const.CONFIG_FILE = str(os.path.dirname(__file__) + '/config.json')
-
-    # Path to the CSV file containing all stock codes
-    Const.STOCKCODE_FILE = str(os.path.dirname(__file__) + '/stock_code.csv')
-
-    # Path to the output CSV file that will contain stock codes meeting all requirements (thresholds)
-    curr_dir = get_output_directory()
-    Const.RESULT_FILE =  curr_dir + f"/{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv"
-
-    # END OF CONST VARIABLES DEFINITION
-    #---------------------------------------------------------------------------------
-
-    #---------------------------------------------------------------------------------
-    # MAIN ROUTINE
-
-    # Run the asynchronous routine to fetch, filter, and save stock data
-    asyncio.run(async_routine(
-        stock_code_path=Const.STOCKCODE_FILE,
-        config_path=Const.CONFIG_FILE,
-        region_code=Const.REGION_CODE,
-        save_path=Const.RESULT_FILE
-    ))
-
-    # END OF MAIN ROUTINE
-    #---------------------------------------------------------------------------------
-
-    # END OF FILE
-    #---------------------------------------------------------------------------------"""
+def show_stock_info(db: dict, stock_code: str):
+    print(f"{stock_code}: {db[stock_code]}")
