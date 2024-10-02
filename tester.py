@@ -4,7 +4,7 @@ import asyncio
 
 from datetime import datetime
 
-from utils import AsyncStockFetcher, Const, JsonDataProcessor, StockFilter
+from utils import AsyncStockFetcher, Const, JsonDataProcessor
 from stock import get_output_directory
 
 # Mock data for testing
@@ -24,11 +24,13 @@ save_path = 'test_raw_data.csv'
 
 # Mock progress callback to print progress updates
 def progress_callback(progress):
-    print(f"Progress: {progress:.2f}%")
+    import sys
+    sys.stdout.flush()
+    print(f"Progress: {progress:.2f}%", end='\r')
 
 
 df = pd.read_csv(Const.STOCKCODE_FILE, header=None)
-stock_code_list = df[df.columns[0]].values.tolist()
+stock_code_list = df[df.columns[0]].values.tolist()[:100]
 
 # Process the JSON configuration file to extract necessary parameters
 processor = JsonDataProcessor()
@@ -37,7 +39,7 @@ interest_info_idxs, thresholds, urls = processor.split_json_to_dicts(Const.CONFI
 # Test function for AsyncStockFetcher
 async def test_async_stock_fetcher():
     # Initialize the fetcher
-    fetcher = AsyncStockFetcher(stock_code_list, urls, progress_callback=progress_callback)
+    fetcher = AsyncStockFetcher(stock_code_list, urls, interest_info_idxs, progress_callback=progress_callback)
     
     # Run the fetcher to get data
     await fetcher.fetch_data()
@@ -61,69 +63,11 @@ async def test_async_stock_fetcher():
     else:
         print(f"Test failed: File {save_path} was not created.")
 
-#------------------------------------------------------------------------------------------------
-# test code for stockfilter class
-
-# Mock data to simulate raw stock data saved by AsyncStockFetcher
-
-# Test save path
-raw_data_path = 'test_raw_data.csv'
-filtered_data_path = 'test_filtered_data.csv'
-
-# Step 2: Test StockFilter functionality
-def test_stock_filter():
-    # Initialize the StockFilter class
-    filterer = StockFilter(interest_info_idxs, thresholds)
-    
-    # Load the raw data
-    raw_df = filterer.load_data(raw_data_path)
-    
-    # Test if the data is loaded correctly
-    if not raw_df.empty:
-        print("Test passed: Raw data loaded successfully.")
-        print(f"Loaded data:\n{raw_df}")
-    else:
-        print("Test failed: Raw data not loaded correctly.")
-        return
-    
-    # Step 3: Test column filtering
-    filtered_columns_df = filterer.filter_interested_value(raw_df)
-    expected_columns = list(interest_info_idxs.keys())
-    
-    # Check if the filtered columns match the expected columns
-    if list(filtered_columns_df.columns) == expected_columns:
-        print("Test passed: Columns filtered successfully.")
-        print(f"Filtered columns:\n{filtered_columns_df}")
-    else:
-        print(f"Test failed: Columns not filtered correctly. Got {list(filtered_columns_df.columns)}")
-
-    # Step 4: Test row filtering based on thresholds
-    filterer.filter_stock(filtered_columns_df)
-    
-    # Check if rows are filtered based on price thresholds
-    filtered_rows_df = filterer.results
-    if not filtered_rows_df.empty:
-        print("Test passed: Rows filtered successfully.")
-        print(f"Filtered rows:\n{filtered_rows_df}")
-    else:
-        print("Test failed: Rows not filtered correctly.")
-    
-    # Save the filtered data
-    filterer.save_filtered_data(filtered_data_path)
-    
-    # Step 5: Verify the filtered data was saved correctly
-    if os.path.exists(filtered_data_path):
-        print(f"Test passed: Filtered data saved to {filtered_data_path}.")
-        df = pd.read_csv(filtered_data_path)
-        print(f"Loaded filtered data:\n{df}")
-    else:
-        print(f"Test failed: Filtered data not saved.")
-
 
 # Main test entry point
 if __name__ == '__main__':
     # Run the async test function
-    # asyncio.run(test_async_stock_fetcher())
+    asyncio.run(test_async_stock_fetcher())
 
     # Clean up the test file
     """if os.path.exists(save_path):
@@ -131,9 +75,25 @@ if __name__ == '__main__':
         print(f"Test file {save_path} removed.")"""
     
     # Run the stock filter tests
-    test_stock_filter()
+    # test_stock_filter()
     
     # Clean up the test files
     """if os.path.exists(filtered_data_path):
         os.remove(filtered_data_path)
         print(f"Test file {filtered_data_path} removed.")"""
+"""    stock_code = "sz000011"
+    url = f"http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stock_code},m1,,10"
+
+    params = {
+        'fields': "f1, f2, f3",
+    }
+    
+    import requests
+    import json
+
+    response = requests.get(url, allow_redirects=True, params=params)
+    text = response.content
+    information = json.loads(text)
+    raw_data = information['data'][stock_code]['qt'][stock_code]
+    print(raw_data)
+"""

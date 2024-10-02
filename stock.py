@@ -1,194 +1,150 @@
-#---------------------------------------------------------------------------------
-# Author: Zhang
-# Date: 2024/09/09
-# FOR PERSONAL USE ONLY.
-#---------------------------------------------------------------------------------
-
-#---------------------------------------------------------------------------------
-# IMPORT REQUIRED PACKAGES HERE
-
-import warnings
 import asyncio
-import os
-import sys
+import aiohttp
 
 import pandas as pd
 
-from datetime import datetime
 
-from utils import AsyncStockFetcher, Const, JsonDataProcessor
-
-# END OF PACKAGE IMPORT
-#---------------------------------------------------------------------------------
-
-warnings.simplefilter(action=r'ignore', category=FutureWarning)
-
-#---------------------------------------------------------------------------------
-# DEFINE GLOBAL VARIABLES HERE
-
-# default output directory name
-_output_dir_name = 'interest_stock'
-
-# END OF GLOBAL VARIABLES' DEFINITION
-#---------------------------------------------------------------------------------
-
-#---------------------------------------------------------------------------------
-# DEFINE FUNCTIONS HERE
-
-def set_output_directory(output_dir_path: str):
+class AsyncStockFetcher:
     """
-    Sets the path for the output directory.
+    AsyncStockFetcher is a class designed to asynchronously fetch, filter, and save stock data.
 
-    Args:
-        output_dir_path (str): The path where the output directory will be located.
+    This class takes a list of stock codes, retrieves the relevant data from specified URLs,
+    filters the data based on predefined thresholds, and allows for saving the filtered data
+    to a CSV file.
+
+    Attributes:
+        stock_list (list): A list of stock codes to fetch data for.
+        interest_info_idxs (dict): A dictionary mapping column names to their respective indexes 
+                                   in the retrieved data.
+        thresholds (dict): A dictionary containing the filtering thresholds for the stock data.
+        urls (dict): A dictionary containing URL prefixes, suffixes, and firewall warning texts.
+
+    Methods:
+        fetch_data(): Fetch data for all stocks in the list asynchronously.
+        filter_data(): Filter the fetched stock data based on defined thresholds.
+        save_data(save_path): Save the filtered data to a CSV file.
     """
-    global _output_dir_name
-    _output_dir_name = output_dir_path
+    def __init__(self, stock_list, urls, interest_info_idxs, progress_callback=None) -> None:
+        self._stock_list = stock_list
+        self._interest_info_idxs = interest_info_idxs
+        self._urls = urls
+        self._all_raw_data = []
 
+        # Callback function
+        self.progress_callback = progress_callback
+        self.total_stocks = len(stock_list)
 
-def get_output_directory(output_dir_name=r'interest_stock') -> str:
-    """
-    Get the base directory of the current executable or script 
-    and ensure the existence of an output folder.
+    # CORE FUNCTION
+    async def _fetch_stock_data(self, session, stock_code: str, semaphore: asyncio.Semaphore, retry_limit=3):
+        """ Fetch stock data for a given stock code asynchronously. """
+        url = f"{self._urls['request']['prefix']}{stock_code}{self._urls['request']['suffix']}"
+        # using semaphores to control concurrency
+        async with semaphore:
+            retries = 0
+            while retries < retry_limit:
+                try:
+                    async with session.get(url, headers=self._urls['request']['headers'], allow_redirects=True) as response:
+                        if 300 <= response.status < 400:
+                            print(f'Warning: Request for stock {stock_code} was redirected.')
+                            return None
+                        elif response.status == 403:
+                            print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
+                            return None
+                        elif response.status == 200:
+                            text = await response.text()
+                            if self._urls['firewallWarning']['text'] in text:
+                                print(f"Warning: Request for stock {stock_code} was blocked by a firewall.")
+                                return None
+                            
+                            try:
+                                information = json.loads(text)['data'][stock_code]['qt'][stock_code]
+                                # only remain data with interest
+                                raw_data = [information[idx['index']] for idx in self._interest_info_idxs.values()]
+                                
+                                # ***************************************************************************************************
+                                # PRE-PROCESSING OF RAW DATA
+                                # THIS PART OF CODE IS FRAGILE
+
+                                # stock code w/o prefix is placed at the 2nd place of raw data list
+                                # so the sub index of stock_code is 2 (sub index starts from 0)
+                                raw_data[1] = stock_code
+                                # all original value in raw data is string
+                                # map all number-type data into float type
+                                raw_data[2:] = [float(item) if item.replace('.', '', 1).isdigit() else item for item in raw_data[2:]]
+
+                                # END OF PRE-PROCESSING OF RAW DATA
+                                # ***************************************************************************************************
+
+                                return raw_data
+                            except (KeyError, ValueError, json.JSONDecodeError) as e:
+                                print(f"Error processing data for stock {stock_code}: {e}")
+                                return None
+                        else:
+                            print(f"Error: Request for stock {stock_code} failed with status {response.status}.")
+                            return None
+                except aiohttp.ClientError as e:
+                    print(f"Client error: {e}")
+                    retries += 1
+                    await asyncio.sleep(2 ** retries)  # Exponential backoff
+                    continue  # retry
+            return None
+
+    async def fetch_data(self):
+        """Fetch data for all stocks in the list asynchronously and update progress."""
+        fetched_count = 0  # number of stocks processed (get response)
+        max_concurrent_requests = 5  # maximum concurrency of requests
+        semaphore = asyncio.Semaphore(max_concurrent_requests)  # limiting the number of concurrent requests with semaphores
+
+        async with aiohttp.ClientSession() as session:
+            task_list = []
+            for stock_code in self._stock_list:
+                task = self._fetch_stock_data(session, stock_code, semaphore)
+                task_list.append(task)
+            
+            # gather results and update progress after each task finishes
+            for result in asyncio.as_completed(task_list):
+                fetched_data = await result
+                if fetched_data:
+                    self._all_raw_data.append(fetched_data)
+                
+                # update the number of stocks which already received response
+                fetched_count += 1
+
+                if self.progress_callback:
+                    progress = fetched_count / self.total_stocks * 100
+                    self.progress_callback(progress)
+
+    def save_data(self, save_path: str):
+        """Save the filtered data to a CSV file."""
+        try:
+            df = pd.DataFrame(self._all_raw_data, columns=self._interest_info_idxs.keys())
+            df.to_csv(save_path, index=False, header=None, encoding='utf-8-sig')
+        except Exception as e:
+            print(f"Error saving data: {e}")
+
     
-    Returns:
-        str: The path to the output directory.
-    """
-    
-    # Determine if the script is running from a packaged executable or in development mode
-    if getattr(sys, 'frozen', False):
-        # The application is running from a packaged executable
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        # The application is running in a development environment (script mode)
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-
-    if os.path.isabs(_output_dir_name):
-        output_dir = _output_dir_name
-    else:
-        output_dir = os.path.join(base_dir, _output_dir_name)
-
-    # Create the output directory within the base directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-
-    return output_dir
-
-
-async def async_routine(stock_code_path: str, config_path: str, region_code: str, save_path: str, progress_callback=None):
-    """
-    A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
-
-    This routine reads a list of stock codes from a CSV file, processes a JSON configuration file 
-    to extract necessary parameters, fetches stock data asynchronously, filters the data based 
-    on specified thresholds, and saves the filtered data to a CSV file.
-
-    Args:
-        stock_code_path (str): The file path to the CSV file containing stock codes.
-        config_path (str): The file path to the JSON configuration file.
-        region_code (str): The region code used to select data from the JSON file.
-        save_path (str): The file path to save the filtered stock data as a CSV file.
-    """
-
-    # Load stock codes from the CSV file into a list
-    df = pd.read_csv(stock_code_path, header=None)
-    stock_code_list = df[df.columns[0]].values.tolist()
-
-    # Process the JSON configuration file to extract necessary parameters
-    processor = JsonDataProcessor()
-    interest_info_idxs, thresholds, urls = processor.split_json_to_dicts(config_path, region_code)
-
-    # Initialize the AsyncStockFetcher with the stock codes and configuration parameters
-    fetcher = AsyncStockFetcher(
-        stock_list=stock_code_list,
-        interest_info_idxs=interest_info_idxs,
-        thresholds=thresholds,
-        urls=urls,
-        progress_callback=progress_callback
-    )
-
-    # Asynchronously fetch the stock data
-    await fetcher.fetch_data()
-    
-    # Filter the fetched data based on thresholds
-    fetcher.filter_data()
-
-    # Save the filtered data to a CSV file
-    fetcher.save_data(save_path)
-
-
-def run_fetching(progress_callback=None):
-    """
-    Executes the asynchronous stock fetching routine.
-
-    This function:
-    - Configures the necessary paths for the configuration and stock code files.
-    - Sets the path for the output CSV file.
-    - Initiates and runs the asynchronous `async_routine` to fetch, process, and save stock data.
-
-    It is designed to be called from the GUI or other interfaces that need to start the fetching process.
-    """
-
-    # Define the region code for data extraction
-    Const.REGION_CODE = 'CN'
-
-    # Define the paths for the configuration JSON file and the stock codes CSV file
-    Const.CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
-    Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
-
-    # Define the path for the output CSV file
-    output_directory = get_output_directory()
-    Const.RESULT_FILE = os.path.join(output_directory, f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv")
-
-    # Run the asynchronous routine to fetch and process the stock data
-    asyncio.run(
-        async_routine(
-            stock_code_path=Const.STOCKCODE_FILE,
-            config_path=Const.CONFIG_FILE,
-            region_code=Const.REGION_CODE,
-            save_path=Const.RESULT_FILE,
-            progress_callback=progress_callback
-        )
-    )
-
-
-# END OF FUNCTIONS DEFINE
+# END OF CLASS DEFINITION
 #---------------------------------------------------------------------------------
 
+#---------------------------------------------------------------------------------
+# UNIT TEST, DEVELOPMENT USE ONLY
+# RUN THE BLOW CODE TO PRINT RAW DATA STRUCTURE
 
 if __name__ == '__main__':
-    #---------------------------------------------------------------------------------
-    # CONST VARIABLES ARE DEFINED HERE
-    # THESE VARIABLES SHOULD NOT BE MODIFIED WITHOUT AUTHOR'S PERMISSION
+
+    import requests
+    import json
+
+    stock_code = "sz000011"
+    url = f"http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stock_code},m1,,10"
     
-    # Setting up the region code, which is used to extract specific data from the config file
-    Const.REGION_CODE = r'CN'
+    response = requests.get(url, allow_redirects=True)
+    information = json.loads(response.content)
+    raw_data = information['data'][stock_code]['qt'][stock_code]
+    print(raw_data)
 
-    # Path to the configuration JSON file
-    Const.CONFIG_FILE = str(os.path.dirname(__file__) + '/config.json')
+# END OF UNIT TEST
+#---------------------------------------------------------------------------------
 
-    # Path to the CSV file containing all stock codes
-    Const.STOCKCODE_FILE = str(os.path.dirname(__file__) + '/stock_code.csv')
-
-    # Path to the output CSV file that will contain stock codes meeting all requirements (thresholds)
-    curr_dir = get_output_directory()
-    Const.RESULT_FILE =  curr_dir + f"/{datetime.now().strftime('%Y-%m-%d_%H_%M')}_interest_stock.csv"
-
-    # END OF CONST VARIABLES DEFINITION
-    #---------------------------------------------------------------------------------
-
-    #---------------------------------------------------------------------------------
-    # MAIN ROUTINE
-
-    # Run the asynchronous routine to fetch, filter, and save stock data
-    asyncio.run(async_routine(
-        stock_code_path=Const.STOCKCODE_FILE,
-        config_path=Const.CONFIG_FILE,
-        region_code=Const.REGION_CODE,
-        save_path=Const.RESULT_FILE
-    ))
-
-    # END OF MAIN ROUTINE
-    #---------------------------------------------------------------------------------
-
-    # END OF FILE
-    #---------------------------------------------------------------------------------"""
+# END OF FILE
+#---------------------------------------------------------------------------------
