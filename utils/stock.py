@@ -44,9 +44,10 @@ class AsyncStockFetcher:
     def __init__(self, stock_list, urls, interest_info_idxs, progress_callback=None) -> None:
         self._urls = urls
 
-        self.all_raw_data = []
+        self._all_raw_data = []
         self.stock_list = stock_list
         self.interest_info_idxs = interest_info_idxs
+        self.df = pd.DataFrame()
 
         # Callback function
         self.progress_callback = progress_callback
@@ -123,7 +124,7 @@ class AsyncStockFetcher:
             for result in asyncio.as_completed(task_list):
                 fetched_data = await result
                 if fetched_data:
-                    self.all_raw_data.append(fetched_data)
+                    self._all_raw_data.append(fetched_data)
                 
                 # update the number of stocks which already received response
                 fetched_count += 1
@@ -146,8 +147,8 @@ class AsyncStockFetcher:
 
         save_path = os.path.join(save_dir, f"{datetime.now().strftime('%Y_%m_%d_%H_%M')}_raw.csv")
         try:
-            df = pd.DataFrame(self.all_raw_data, columns=self.interest_info_idxs.keys())
-            df.to_csv(save_path, index=False, encoding='utf-8-sig')
+            self.df = pd.DataFrame(self._all_raw_data, columns=self.interest_info_idxs.keys())
+            self.df.to_csv(save_path, index=False, encoding='utf-8-sig')
         except Exception as e:
             print(f"Error saving data: {e}")
 
@@ -236,6 +237,18 @@ class StockDatabase:
         
         # Print table bottom border
         print(border)
+
+    def update(self, new_data: pd.DataFrame):
+        """
+        Update the raw_data with new stock data.
+
+        Parameters:
+        new_data (pd.DataFrame): A new DataFrame to replace the existing raw_data.
+                                 The DataFrame should have the same structure as the original raw_data,
+                                 including a 'Stock Code' column.
+        """
+        print(f"Stock information is updated on {datetime.now().strftime('%Y-%m-%d %H:%M')}.")
+        self.raw_data = new_data
 
     
 # END OF CLASS DEFINITION

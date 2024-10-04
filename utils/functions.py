@@ -96,7 +96,7 @@ def show_start_menu():
     print(f'#')
     print(f'# --------------------------- COMMAND LIST ------------------------------- #')
     print(f'#')
-    print(f'#   get_raw_data:         Start to fetch all stock information')
+    print(f'#   update:               Start to fetch all stock information')
     print(f'#   show [stock_code]:    Displaying information about a specified stock ')
     print(f'#')
     print(f'# ------------------------------------------------------------------------ #')
@@ -130,22 +130,7 @@ def initial_program(stock_code_file: str, config_file: str, region_code: str) ->
         print(f"An unexpected error occurred - {e}")
 
 
-def stocks_list_to_dict(stocks_list) -> dict:
-    """
-    Convert a 2D list of stock data into a dictionary.
-    
-    :param stocks_list: list of lists, where each row contains stock information, and the second element is the stock code.
-    :return: dict, where the key is the stock code, and the value is the remaining stock information.
-    """
-    stocks_dict = {}
-    for row in stocks_list:
-        stock_code = row[1]  # The second element is the stock code
-        stock_info = row[:1] + row[2:]  # All information except the stock code
-        stocks_dict[stock_code] = stock_info
-    return stocks_dict
-
-
-async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: str) -> dict:
+async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: str):
     """
     A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
 
@@ -167,6 +152,3 @@ async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: st
     # Save the filtered data to a CSV file
     fetcher.save_data(raw_data_save_dir)
     print("Finished. Real-time data information updated sucessfully...")
-
-    db = stocks_list_to_dict(fetcher.all_raw_data)
-    return db
