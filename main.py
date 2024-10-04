@@ -14,6 +14,7 @@
 import os
 import asyncio
 import time
+import pandas as pd
 
 from datetime import datetime
 
@@ -44,7 +45,7 @@ async def main():
         progress_callback=funcs.progress_callback
     )
 
-    db = None
+    raw_data = None
 
     if not os.path.exists(comps.Const.RAW_DATA_DIR):
         os.makedirs(comps.Const.RAW_DATA_DIR)
@@ -52,30 +53,38 @@ async def main():
     if len(os.listdir(comps.Const.RAW_DATA_DIR)) == 0:
         print("No previous data detected. Start fetching new data by default...")
         time.sleep(0.5)
-        db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+        await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+        raw_data = fetcher.df
     else:
-        latest_file = os.listdir(comps.Const.DATABASE_PATH)[-1]
-        user_input = input(f"Previous data detected. Load data from latest file {latest_file}? (y/n): ").lower().strip()
+        latest_file_name = os.listdir(comps.Const.RAW_DATA_DIR)[-1]
+        user_input = input(f"Previous data detected. Load data from latest file {latest_file_name}? (y/n): ").lower().strip()
         if user_input == 'y':
-            print(f'Loading data from {latest_file}...')
+            print(f'Data loaded from {latest_file_name}.')
+            latest_file_path = os.path.join(comps.Const.RAW_DATA_DIR, latest_file_name)
+            raw_data = pd.read_csv(latest_file_path)
             pass
         elif user_input == 'n':
             print('Start to fetch new data...')
-            db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            raw_data = fetcher.df
         else:
             print("Invalid input, fetching new data by default...")
-            db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            raw_data = fetcher.df
+
+    db = stock.StockDatabase(raw_data=raw_data)
 
     while True:
-        user_input = input(">command: ").lower().strip()
+        user_input = input("Waiting for command: ").lower().strip()
         if user_input == 'exit':
             print("Exiting...")
             break
         elif user_input.startswith('show'):
             search_code_list = user_input.split(' ')[1:]
-            pass
-        elif user_input.startswith('get_raw_data'):
-            db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            db.show_stock_info(search_code_list)
+        elif user_input.startswith('update'):
+            await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            db.update(new_data=fetcher.df)
         else:
             pass
 
