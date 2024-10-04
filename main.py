@@ -13,6 +13,7 @@
 
 import os
 import asyncio
+import time
 
 from datetime import datetime
 
@@ -26,7 +27,7 @@ async def main():
     comps.Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
 
 
-    comps.Const.DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'database')
+    comps.Const.RAW_DATA_DIR = os.path.join(os.path.dirname(__file__), 'raw_data')
     comps.Const.REGION_CODE = 'CN'
 
 
@@ -45,34 +46,36 @@ async def main():
 
     db = None
 
-    if len(os.listdir(comps.Const.DATABASE_PATH)) == 0:
-        print("Database is now empty. Start to fetch new data...")
-        save_path = os.path.join(comps.Const.DATABASE_PATH, f"{datetime.now().strftime('%Y_%m_%d_%H_%M')}_raw_stock_info.csv")
-        db = await funcs.async_fetch_raw_data(fetcher, save_path)
+    if not os.path.exists(comps.Const.RAW_DATA_DIR):
+        os.makedirs(comps.Const.RAW_DATA_DIR)
+
+    if len(os.listdir(comps.Const.RAW_DATA_DIR)) == 0:
+        print("No previous data detected. Start fetching new data by default...")
+        time.sleep(0.5)
+        db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
     else:
-        latest = os.listdir(comps.Const.DATABASE_PATH)[-1]
-        user_input = input(f"Load data from latest file {latest}? (y/n): ").lower().strip()
+        latest_file = os.listdir(comps.Const.DATABASE_PATH)[-1]
+        user_input = input(f"Previous data detected. Load data from latest file {latest_file}? (y/n): ").lower().strip()
         if user_input == 'y':
-            print(f'Loading data from {latest}...')
+            print(f'Loading data from {latest_file}...')
             pass
         elif user_input == 'n':
             print('Start to fetch new data...')
-            save_path = os.path.join(comps.Const.DATABASE_PATH, f"{datetime.now().strftime('%Y_%m_%d_%H_%M')}_raw_stock_info.csv")
-            db = await funcs.async_fetch_raw_data(fetcher, save_path)
+            db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
         else:
             print("Invalid input, fetching new data by default...")
-            db = await funcs.async_fetch_raw_data(fetcher, save_path)
-    print('\n')
+            db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+
     while True:
         user_input = input(">command: ").lower().strip()
         if user_input == 'exit':
             print("Exiting...")
             break
         elif user_input.startswith('show'):
-            funcs.show_stock_info(db, user_input[-6:])
+            search_code_list = user_input.split(' ')[1:]
+            pass
         elif user_input.startswith('get_raw_data'):
-            save_path = os.path.join(comps.Const.DATABASE_PATH, f"{datetime.now().strftime('%Y_%m_%d_%H_%M')}_raw_stock_info.csv")
-            db = await funcs.async_fetch_raw_data(fetcher, save_path)
+            db = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
         else:
             pass
 

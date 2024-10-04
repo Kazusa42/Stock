@@ -1,99 +1,102 @@
-import os
 import pandas as pd
-import asyncio
+import unicodedata
 
-from datetime import datetime
+class StockDatabase:
+    def __init__(self, raw_data: pd.DataFrame):
+        """
+        Initialize the StockDatabase with raw stock data.
 
-from utils.component import Const, JsonDataProcessor
+        Parameters:
+        raw_data (pd.DataFrame): A DataFrame where each row represents stock information.
+                                 The DataFrame should have at least the following columns:
+                                 ['Stock Code', 'Stock Name', 'Price', 'Volume', ...]
+        """
+        self.raw_data = raw_data
 
-# Mock data for testing
+    def _get_display_width(self, text: str) -> int:
+        """
+        Calculate the display width of a string, considering the different widths of Chinese and English characters.
 
-Const.REGION_CODE = 'CN'
+        Parameters:
+        text (str): The input string.
 
-"""# Define the paths for the configuration JSON file and the stock codes CSV file
-Const.CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'config.json')
-Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
+        Returns:
+        int: The display width of the string.
+        """
+        width = 0
+        for char in text:
+            if unicodedata.east_asian_width(char) in ('F', 'W'):
+                width += 2  # Full-width or wide character (like Chinese)
+            else:
+                width += 1  # Regular-width character (like English)
+        return width
 
-# Define the path for the output CSV file
-Const.RESULT_FILE = os.path.join(output_directory, f"{datetime.now().strftime('%Y-%m-%d_%H_%M')}_raw_stock_info.csv")
+    def _format_cell(self, text: str, width: int) -> str:
+        """
+        Format a cell's content by right-aligning it according to its display width.
 
-# Test save path
-save_path = 'test_raw_data.csv'
+        Parameters:
+        text (str): The text to format.
+        width (int): The target display width for the cell.
 
-# Mock progress callback to print progress updates
-def progress_callback(progress):
-    import sys
-    sys.stdout.flush()
-    print(f"Progress: {progress:.2f}%", end='\r')
+        Returns:
+        str: The formatted text, right-aligned.
+        """
+        text_width = self._get_display_width(text)
+        padding = width - text_width
+        return ' ' * padding + text
 
+    def show_stock_info(self, stock_codes: list):
+        """
+        Display stock information in a table format for the given stock codes.
 
-df = pd.read_csv(Const.STOCKCODE_FILE, header=None)
-stock_code_list = df[df.columns[0]].values.tolist()[:100]
-
-# Process the JSON configuration file to extract necessary parameters
-processor = JsonDataProcessor()
-interest_info_idxs, thresholds, urls = processor.split_json_to_dicts(Const.CONFIG_FILE, Const.REGION_CODE)
-
-# Test function for AsyncStockFetcher
-async def test_async_stock_fetcher():
-    # Initialize the fetcher
-    fetcher = AsyncStockFetcher(stock_code_list, urls, interest_info_idxs, progress_callback=progress_callback)
-    
-    # Run the fetcher to get data
-    await fetcher.fetch_data()
-
-    # Save the raw data to CSV
-    fetcher.save_data(save_path)
-
-    # Check if the CSV file was created
-    if os.path.exists(save_path):
-        print(f"Test passed: File {save_path} created successfully.")
+        Parameters:
+        stock_codes (list): A list of stock codes to display information for.
+        """
+        # Filter the DataFrame to include only rows with the specified stock codes
+        filtered_data = self.raw_data[self.raw_data['stockCode'].isin(stock_codes)]
         
-        # Load the data and inspect it
-        df = pd.read_csv(save_path)
-        print(f"Loaded data:\n{df.head()}")
+        if filtered_data.empty:
+            print("No matching stock found.")
+            return
+
+        # Extract column headers and the data to be displayed
+        columns = filtered_data.columns.tolist()
+        data = filtered_data.values.tolist()
+
+        # Determine the display width of each column for formatting
+        col_widths = [max(self._get_display_width(str(val)) for val in [col] + list(filtered_data[col])) for col in columns]
+
+        # Generate table border based on column widths
+        border = '+' + '+'.join(['-' * (w + 2) for w in col_widths]) + '+'
+
+        # Function to format each row with right-aligned text
+        def format_row(row):
+            return '|' + '|'.join([f' {self._format_cell(str(val), w)} ' for val, w in zip(row, col_widths)]) + '|'
+
+        # Print table header
+        print(border)
+        print(format_row(columns))
+        print(border)
+
+        # Print each row of stock information
+        for row in data:
+            print(format_row(row))
         
-        # Optionally, add more checks to verify the content
-        if not df.empty:
-            print(f"Test passed: Data saved successfully with {len(df)} rows.")
-        else:
-            print(f"Test failed: No data saved to {save_path}.")
-    else:
-        print(f"Test failed: File {save_path} was not created.")"""
+        # Print table bottom border
+        print(border)
 
-
-# Main test entry point
-if __name__ == '__main__':
-    # Run the async test function
-    # asyncio.run(test_async_stock_fetcher())
-    Const.STOCKCODE_FILE = os.path.join(os.path.dirname(__file__), 'stock_code.csv')
-    print(datetime.now().strftime('%Y-%m-%d %H:%M'))
-
-    # Clean up the test file
-    """if os.path.exists(save_path):
-        os.remove(save_path)
-        print(f"Test file {save_path} removed.")"""
-    
-    # Run the stock filter tests
-    # test_stock_filter()
-    
-    # Clean up the test files
-    """if os.path.exists(filtered_data_path):
-        os.remove(filtered_data_path)
-        print(f"Test file {filtered_data_path} removed.")"""
-"""    stock_code = "sz000011"
-    url = f"http://ifzq.gtimg.cn/appstock/app/kline/mkline?param={stock_code},m1,,10"
-
-    params = {
-        'fields': "f1, f2, f3",
-    }
-    
-    import requests
-    import json
-
-    response = requests.get(url, allow_redirects=True, params=params)
-    text = response.content
-    information = json.loads(text)
-    raw_data = information['data'][stock_code]['qt'][stock_code]
-    print(raw_data)
+# Example usage:
+# Assuming you have a DataFrame 'raw_data' with stock information
+# raw_data = pd.read_csv(r'C:\Users\a5149517\Desktop\Stock-main\raw_data\2024_10_04_11_11_raw.csv')
 """
+
+db = StockDatabase(raw_data)
+db.show_stock_info(['sh688517', 'sh600180'])"""
+
+def test_prase_command(user_input: str):
+    return user_input.split(' ')[1:]
+
+user_input = input('command:').lower().strip()
+print(test_prase_command(user_input))
+
