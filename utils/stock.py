@@ -108,7 +108,7 @@ class AsyncStockFetcher:
                     continue  # retry
             return None
 
-    async def fetch_data(self):
+    async def fetch_data(self) -> int:
         """Fetch data for all stocks in the list asynchronously and update progress."""
         fetched_count = 0  # number of stocks processed (get response)
         max_concurrent_requests = 5  # maximum concurrency of requests
@@ -123,8 +123,11 @@ class AsyncStockFetcher:
             # gather results and update progress after each task finishes
             for result in asyncio.as_completed(task_list):
                 fetched_data = await result
+
                 if fetched_data:
                     self._all_raw_data.append(fetched_data)
+                else:
+                    return 1
                 
                 # update the number of stocks which already received response
                 fetched_count += 1
@@ -132,6 +135,7 @@ class AsyncStockFetcher:
                 if self.progress_callback:
                     progress = fetched_count / self.total_stocks * 100
                     self.progress_callback(progress)
+        return 0
 
     def save_data(self, save_dir: str):
         """

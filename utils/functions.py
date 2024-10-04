@@ -130,7 +130,7 @@ def initial_program(stock_code_file: str, config_file: str, region_code: str) ->
         print(f"An unexpected error occurred - {e}")
 
 
-async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: str):
+async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: str) -> int:
     """
     A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
 
@@ -146,9 +146,13 @@ async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: st
     print(f"Start to fetch real-time data at time {datetime.now().strftime('%Y_%m_%d_%H_%M')} ...")
 
     # Asynchronously fetch the stock data
-    await fetcher.fetch_data()
-    print("Fetching complete. Start to save data...")
+    status = await fetcher.fetch_data()
+    if status == 1:
+        print("Fetching data filed.")
+    elif status == 0:
+        print("Fetching complete. Start to save data...")
 
-    # Save the filtered data to a CSV file
-    fetcher.save_data(raw_data_save_dir)
-    print("Finished. Real-time data information updated sucessfully...")
+        # Save the filtered data to a CSV file
+        fetcher.save_data(raw_data_save_dir)
+        print("Finished. Real-time data information updated sucessfully...")
+    return status
