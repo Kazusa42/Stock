@@ -145,7 +145,7 @@ def stocks_list_to_dict(stocks_list) -> dict:
     return stocks_dict
 
 
-async def async_fetch_raw_data(fetcher: AsyncStockFetcher, save_path: str) -> dict:
+async def async_fetch_raw_data(fetcher: AsyncStockFetcher, raw_data_save_dir: str) -> dict:
     """
     A coroutine to asynchronously fetch and process stock data, then save the results to a CSV file.
 
@@ -155,17 +155,18 @@ async def async_fetch_raw_data(fetcher: AsyncStockFetcher, save_path: str) -> di
 
     Args:
         fetcher (AsyncStockFetcher): The instance of a AsyncStockFetcher class, used to fetch raw data
-        save_path (str): The file path to save the filtered stock data as a CSV file.
+        raw_data_save_dir (str): The directory path to save the raw stock data as a CSV file.
     """
+    # Add time stamp
+    print(f"Start to fetch real-time data at time {datetime.now().strftime('%Y_%m_%d_%H_%M')} ...")
 
     # Asynchronously fetch the stock data
     await fetcher.fetch_data()
+    print("Fetching complete. Start to save data...")
 
     # Save the filtered data to a CSV file
-    fetcher.save_data(save_path)
+    fetcher.save_data(raw_data_save_dir)
+    print("Finished. Real-time data information updated sucessfully...")
 
     db = stocks_list_to_dict(fetcher.all_raw_data)
     return db
-
-def show_stock_info(db: dict, stock_code: str):
-    print(f"{stock_code}: {db[stock_code]}")

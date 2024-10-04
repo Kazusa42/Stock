@@ -14,7 +14,11 @@
 
 import asyncio
 import aiohttp
+import unicodedata
 import json
+import os
+
+from datetime import datetime
 
 import pandas as pd
 
@@ -128,13 +132,110 @@ class AsyncStockFetcher:
                     progress = fetched_count / self.total_stocks * 100
                     self.progress_callback(progress)
 
-    def save_data(self, save_path: str):
-        """Save the filtered data to a CSV file."""
+    def save_data(self, save_dir: str):
+        """
+        Save the filtered data to a CSV file.
+
+        Args:
+            save_dir (str): The directory path to save data.
+        """
+
+        # check if the directory exits, if not exits then create one
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        save_path = os.path.join(save_dir, f"{datetime.now().strftime('%Y_%m_%d_%H_%M')}_raw.csv")
         try:
             df = pd.DataFrame(self.all_raw_data, columns=self.interest_info_idxs.keys())
-            df.to_csv(save_path, index=False, header=None, encoding='utf-8-sig')
+            df.to_csv(save_path, index=False, encoding='utf-8-sig')
         except Exception as e:
             print(f"Error saving data: {e}")
+
+
+class StockDatabase:
+    def __init__(self, raw_data: pd.DataFrame):
+        """
+        Initialize the StockDatabase with raw stock data.
+
+        Parameters:
+        raw_data (pd.DataFrame): A DataFrame where each row represents stock information.
+                                 The DataFrame should have at least the following columns:
+                                 ['Stock Code', 'Stock Name', 'Price', 'Volume', ...]
+        """
+        self.raw_data = raw_data
+
+    def _get_display_width(self, text: str) -> int:
+        """
+        Calculate the display width of a string, considering the different widths of Chinese and English characters.
+
+        Parameters:
+        text (str): The input string.
+
+        Returns:
+        int: The display width of the string.
+        """
+        width = 0
+        for char in text:
+            if unicodedata.east_asian_width(char) in ('F', 'W'):
+                width += 2  # Full-width or wide character (like Chinese)
+            else:
+                width += 1  # Regular-width character (like English)
+        return width
+
+    def _format_cell(self, text: str, width: int) -> str:
+        """
+        Format a cell's content by right-aligning it according to its display width.
+
+        Parameters:
+        text (str): The text to format.
+        width (int): The target display width for the cell.
+
+        Returns:
+        str: The formatted text, right-aligned.
+        """
+        text_width = self._get_display_width(text)
+        padding = width - text_width
+        return ' ' * padding + text
+
+    def show_stock_info(self, stock_codes: list):
+        """
+        Display stock information in a table format for the given stock codes.
+
+        Parameters:
+        stock_codes (list): A list of stock codes to display information for.
+        """
+        # Filter the DataFrame to include only rows with the specified stock codes
+        filtered_data = self.raw_data[self.raw_data['stockCode'].isin(stock_codes)]
+        
+        if filtered_data.empty:
+            print("No matching stock found.")
+            return
+
+        # Extract column headers and the data to be displayed
+        columns = filtered_data.columns.tolist()
+        data = filtered_data.values.tolist()
+
+        # Determine the display width of each column for formatting
+        col_widths = [max(self._get_display_width(str(val)) for val in [col] + list(filtered_data[col])) for col in columns]
+
+        # Generate table border based on column widths
+        border = '+' + '+'.join(['-' * (w + 2) for w in col_widths]) + '+'
+
+        # Function to format each row with right-aligned text
+        def format_row(row):
+            return '|' + '|'.join([f' {self._format_cell(str(val), w)} ' for val, w in zip(row, col_widths)]) + '|'
+
+        # Print table header
+        print(border)
+        print(format_row(columns))
+        print(border)
+
+        # Print each row of stock information
+        for row in data:
+            print(format_row(row))
+        
+        # Print table bottom border
+        print(border)
 
     
 # END OF CLASS DEFINITION
