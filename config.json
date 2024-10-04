@@ -9,15 +9,15 @@
                 "index": 2,
                 "valid": true
             },
-            "currPrice": {
+            "curr": {
                 "index": 3,
                 "valid": true
             },
-            "prevClosedPrice": {
+            "prevClosed": {
                 "index": 4,
                 "valid": true
             },
-            "openPrice": {
+            "open": {
                 "index": 5,
                 "valid": true
             },
@@ -33,31 +33,31 @@
                 "index": 34,
                 "valid": true
             },
-            "turnOverRate": {
+            "turnOver": {
                 "index": 38,
                 "valid": true
             },
-            "ampRate": {
+            "amp": {
                 "index": 43,
                 "valid": true
             },
-            "tmCap": {
+            "tm": {
                 "index": 44,
                 "valid": true
             }
         },
         "thre": {
-            "ampRate": {
+            "amp": {
                 "lower": 3,
                 "upper": 6,
                 "valid": false
             },
-            "turnOverRate": {
+            "turnOver": {
                 "lower": 5,
                 "upper": 10,
                 "valid": true
             },
-            "tmCap": {
+            "tm": {
                 "lower": 50,
                 "upper": 120,
                 "valid": true

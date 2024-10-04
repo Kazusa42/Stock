@@ -12,6 +12,7 @@
 #---------------------------------------------------------------------------------
 
 import os
+import sys
 import asyncio
 import time
 import pandas as pd
@@ -53,7 +54,11 @@ async def main():
     if len(os.listdir(comps.Const.RAW_DATA_DIR)) == 0:
         print("No previous data detected. Start fetching new data by default...")
         time.sleep(0.5)
-        await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+        status = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+        if status == 1:
+            print("Can not fetch data. Existing program...")
+            time.sleep(0.5)
+            sys.exit()
         raw_data = fetcher.df
     else:
         latest_file_name = os.listdir(comps.Const.RAW_DATA_DIR)[-1]
@@ -65,11 +70,19 @@ async def main():
             pass
         elif user_input == 'n':
             print('Start to fetch new data...')
-            await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            status = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            if status == 1:
+                print("Can not fetch data. Existing program...")
+                time.sleep(0.5)
+                sys.exit()
             raw_data = fetcher.df
         else:
             print("Invalid input, fetching new data by default...")
-            await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            status = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            if status == 1:
+                print("Can not fetch data. Existing program...")
+                time.sleep(0.5)
+                sys.exit()
             raw_data = fetcher.df
 
     db = stock.StockDatabase(raw_data=raw_data)
@@ -84,7 +97,11 @@ async def main():
             db.show_stock_info(search_code_list)
         elif user_input.startswith('update'):
             await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
-            db.update(new_data=fetcher.df)
+            if status == 1:
+                print("Failed to update stock information. Try later...")
+            else:
+                print("Update stock information successuflly.")
+                db.update(new_data=fetcher.df)
         else:
             pass
 

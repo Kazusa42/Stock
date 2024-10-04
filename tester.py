@@ -94,9 +94,10 @@ class StockDatabase:
 db = StockDatabase(raw_data)
 db.show_stock_info(['sh688517', 'sh600180'])"""
 
-def test_prase_command(user_input: str):
+"""def test_prase_command(user_input: str):
     return user_input.split(' ')[1:]
 
 user_input = input('command:').lower().strip()
-print(test_prase_command(user_input))
+print(test_prase_command(user_input))"""
 
+print((0 or 1))
