@@ -158,7 +158,7 @@ class AsyncStockFetcher:
 
 
 class StockDatabase:
-    def __init__(self, raw_data: pd.DataFrame):
+    def __init__(self, raw_data: pd.DataFrame, keyword=r'stockCode'):
         """
         Initialize the StockDatabase with raw stock data.
 
@@ -168,6 +168,7 @@ class StockDatabase:
                                  ['Stock Code', 'Stock Name', 'Price', 'Volume', ...]
         """
         self.raw_data = raw_data
+        self._keyword = keyword
 
     def _get_display_width(self, text: str) -> int:
         """
@@ -210,7 +211,7 @@ class StockDatabase:
         stock_codes (list): A list of stock codes to display information for.
         """
         # Filter the DataFrame to include only rows with the specified stock codes
-        filtered_data = self.raw_data[self.raw_data['stockCode'].isin(stock_codes)]
+        filtered_data = self.raw_data[self.raw_data[self._keyword].isin(stock_codes)]
         
         if filtered_data.empty:
             print("No matching stock found.")
@@ -253,6 +254,40 @@ class StockDatabase:
         """
         print(f"Stock information is updated on {datetime.now().strftime('%Y-%m-%d %H:%M')}.")
         self.raw_data = new_data
+
+    def filter_stocks(self, thresholds: dict) -> list:
+        """
+        Filter stocks based on the provided threshold conditions using DataFrame.query()
+        and return the list of stock codes that meet the filtering criteria.
+
+        Parameters:
+        thresholds (dict): A dictionary where the key is the stock metric (column name) to filter by,
+                        and the value is another dictionary with 'lower', 'upper', and 'valid' keys.
+
+        Returns:
+        list: A list of stock codes that meet the filtering criteria.
+        """
+        # Initialize an empty list to hold query conditions
+        query_conditions = []
+
+        # Build query conditions with 'and'
+        for metric, condition in thresholds.items():
+            lower = condition.get('lower', float('-inf'))
+            upper = condition.get('upper', float('inf'))
+            # create the query condition for current metric
+            query_conditions.append(f"{lower} <= {metric} <= {upper}")
+
+        # combine al query conditions with 'and'
+        query_str = ' and '.join(query_conditions)
+
+        # if there are no valid conditions, return all stock codes
+        # this will work when threshold is empty
+        if not query_str:
+            return self.raw_data[self._keyword].tolist()
+        
+        # use DataFrame.query() to filter the data
+        filtered_data = self.raw_data.query(query_str)
+        return filtered_data[self._keyword].tolist()
 
     
 # END OF CLASS DEFINITION

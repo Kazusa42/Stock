@@ -96,12 +96,17 @@ async def main():
             search_code_list = user_input.split(' ')[1:]
             db.show_stock_info(search_code_list)
         elif user_input.startswith('update'):
-            await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
+            status = await funcs.async_fetch_raw_data(fetcher, comps.Const.RAW_DATA_DIR)
             if status == 1:
                 print("Failed to update stock information. Try later...")
             else:
                 print("Update stock information successuflly.")
                 db.update(new_data=fetcher.df)
+        elif user_input.startswith('filter'):
+            print(f"Filtering stock with default thresholds...")
+            print(f"Filtering results:")
+            interest_stocks = db.filter_stocks(thresholds=thresholds)
+            db.show_stock_info(interest_stocks)
         else:
             pass
 

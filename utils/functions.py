@@ -100,6 +100,7 @@ def show_start_menu():
     print(f'#   show [stock_code]:    Displaying information about a specified stock ')
     print(f'#')
     print(f'# ------------------------------------------------------------------------ #')
+    print(f"\n")
 
 
 def initial_program(stock_code_file: str, config_file: str, region_code: str) -> AsyncStockFetcher:
