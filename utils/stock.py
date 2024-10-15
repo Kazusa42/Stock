@@ -89,7 +89,8 @@ class AsyncStockFetcher:
                                 raw_data[1] = stock_code
                                 # all original value in raw data is string
                                 # map all number-type data into float type
-                                raw_data[2:] = [float(item) if item.replace('.', '', 1).isdigit() else item for item in raw_data[2:]]
+                                # raw_data[2:] = [float(item) if item.replace('.', '', 1).isdigit() else item for item in raw_data[2:]]
+                                raw_data[2:] = [float(item) for item in raw_data[2:]]
 
                                 # END OF PRE-PROCESSING OF RAW DATA
                                 # ***************************************************************************************************
